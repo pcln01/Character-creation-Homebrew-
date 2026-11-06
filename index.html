@@ -1,6 +1,7 @@
 <!doctype html>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
+<script>window.SIEGEL_DRIVE=""</script>
 <title>Siegelrolle</title>
 <meta name="claude:viewport-fit-sides" content="cover">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -279,14 +280,14 @@ function isYokai(c){return c.raceId!=='mensch'}
 function setStatus(t){$('#status').innerHTML=t}
 function lsLoad(){try{const v=localStorage.getItem('siegelrolle');return v?JSON.parse(v):[]}catch(e){return[]}}
 function lsSave(){try{localStorage.setItem('siegelrolle',JSON.stringify(S.chars))}catch(e){}}
-function save(){lsSave();if(store.mode!=='db')return;store.dirty=true;clearTimeout(store.timer);store.timer=setTimeout(flush,700);setStatus('Speichert …')}
+function save(){lsSave();if(store.mode==='drive'){driveSave();return}if(store.mode!=='db')return;store.dirty=true;clearTimeout(store.timer);store.timer=setTimeout(flush,700);setStatus('Speichert …')}
 async function flush(){if(store.writing||!store.dirty)return;store.writing=true;store.dirty=false;
   try{await store.ref.set({chars:JSON.parse(JSON.stringify(S.chars)),updated:Date.now()});setStatus('<b>Gespeichert</b> · für dich und deine Gruppe sichtbar')}
   catch(e){if(e&&e.code==='invalid_argument'){store.mode='local';setStatus('Nur in diesem Browser gespeichert: du hast keine Schreibrechte für die Rolle. Bitte den Spielleiter, dich als Contributor einzuladen.')}else if(e&&e.code==='quota_exceeded'){setStatus('<span class="warn">Speicher voll.</span> Lösche alte Charaktere.')}else{setStatus('Speichern fehlgeschlagen, neuer Versuch …');store.dirty=true;setTimeout(flush,1500+Math.random()*1000)}}
   finally{store.writing=false;if(store.dirty)flush()}}
 async function initStore(){
   S.chars=lsLoad();if(S.chars.length)S.sel=S.chars[0].id;render();
-  const api=window.claude;if(!api||!api.use){setStatus('Gespeichert in diesem Browser.');return}
+  const api=window.claude;if(!api||!api.use){if(DRIVE_URL)driveInit();else setStatus('Gespeichert in diesem Browser.');return}
   const [db,user]=await Promise.all([api.use('db'),api.use('user')]);
   store.db=db;store.user=user;store.uid=user?await user.id():null;
   if(!db||!store.uid){setStatus('Gespeichert nur in diesem Browser (nicht angemeldet).');return}
@@ -384,7 +385,7 @@ function vital(label,val,max,key,cls){const inp=h('input',{class:'num',type:'num
     h('div',{class:'row'},inp,h('button',{class:'btn ghost small',type:'button',onclick:()=>upd(c=>{c[key]=max})},'Voll')))}
 function sec(kj,title,...kids){return h('section',{class:'sec'},h('div',{class:'vt','aria-hidden':'true'},kj),h('div',{},h('h2',{},title),...kids))}
 function confirmDel(c){modal(d=>{d.append(h('h2',{},'„'+(c.name||'Ohne Namen')+'“ löschen?'),h('p',{class:'note'},'Der Charakter verschwindet von deiner Rolle und aus der Gruppenansicht. Das lässt sich nicht rückgängig machen.'),
-  h('div',{class:'foot'},h('button',{class:'btn ghost',type:'button',onclick:closeModal},'Behalten'),h('button',{class:'btn',type:'button',onclick:()=>{S.chars=S.chars.filter(x=>x.id!==c.id);S.sel=S.chars[0]?.id||null;closeModal();save();render();toast('Charakter gelöscht')}},'Endgültig löschen')))})}
+  h('div',{class:'foot'},h('button',{class:'btn ghost',type:'button',onclick:closeModal},'Behalten'),h('button',{class:'btn',type:'button',onclick:()=>{driveRemove(c.id);S.chars=S.chars.filter(x=>x.id!==c.id);S.sel=S.chars[0]?.id||null;closeModal();save();render();toast('Charakter gelöscht')}},'Endgültig löschen')))})}
 
 /* features up to level */
 function featuresAt(c,lv){const cl=C[c.classId],r=R[c.raceId];const out=[];
@@ -541,7 +542,7 @@ async function exportPdf(c){toast('PDF wird erstellt …');
     const pxPerPage=Math.floor(cv.width*ph/pw);const k=cv.width/sheet.offsetWidth;const cuts=[...sheet.querySelectorAll(':scope > *')].map(e=>Math.round((e.offsetTop+e.offsetHeight)*k));let y=0,first=true;
     while(y<cv.height){let hgt=Math.min(pxPerPage,cv.height-y);if(y+hgt<cv.height){const ok=cuts.filter(v=>v>y+pxPerPage*0.5&&v<=y+pxPerPage);if(ok.length)hgt=Math.max(...ok)-y}const part=document.createElement('canvas');part.width=cv.width;part.height=hgt;const g=part.getContext('2d');g.fillStyle='#faf7f0';g.fillRect(0,0,part.width,hgt);g.drawImage(cv,0,y,cv.width,hgt,0,0,cv.width,hgt);
       if(!first)pdf.addPage();pdf.addImage(part.toDataURL('image/jpeg',0.9),'JPEG',0,0,pw,hgt*pw/cv.width);first=false;y+=hgt}
-    const data=JSON.parse(JSON.stringify({...c,sub:subOf(c)}));
+    const data=JSON.parse(JSON.stringify({...c,sub:subOf(c),syncKey:store.mode==='drive'?charKey(c.id):undefined}));
     pdf.setDocumentProperties({title:(c.name||'Charakter')+' · Siegelrolle',subject:PDF_MARK[0]+b64enc(JSON.stringify({v:1,char:data}))+PDF_MARK[1],creator:'Siegelrolle',keywords:'Das gebrochene Siegel'});
     const blob=pdf.output('blob');const fn=(c.name||'Charakter').replace(/[\\/:*?"<>|]+/g,'').trim()+' - Stufe '+c.level+'.pdf';
     await saveFile(fn,blob,'PDF gespeichert');
@@ -555,7 +556,7 @@ async function saveFile(fn,blob,msg){const dl=window.claude&&window.claude.use?a
   if(dl){try{await dl.save({filename:fn,data:blob});toast(msg)}catch(e){toast(e&&e.code==='declined'?'Speichern abgebrochen':'Speichern ging hier nicht ('+(e&&e.code||'Fehler')+')')}return}
   const a=h('a',{href:URL.createObjectURL(blob),download:fn});document.body.append(a);a.click();setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove()},4000);toast(msg)}
 function fileBase(c){return (c.name||'Charakter').replace(/[\\/:*?"<>|]+/g,'').trim()+' - Stufe '+c.level}
-function exportJson(c){const blob=new Blob([JSON.stringify({app:'siegelrolle',v:1,exported:new Date().toISOString(),char:{...c,sub:subOf(c)}})],{type:'application/json'});saveFile(fileBase(c)+'.json',blob,'Datei gespeichert')}
+function exportJson(c){const blob=new Blob([JSON.stringify({app:'siegelrolle',v:1,exported:new Date().toISOString(),char:{...c,sub:subOf(c),syncKey:store.mode==='drive'?charKey(c.id):undefined}})],{type:'application/json'});saveFile(fileBase(c)+'.json',blob,'Datei gespeichert')}
 function validChar(x){return x&&typeof x==='object'&&x.raceId&&x.classId&&R[x.raceId]&&C[x.classId]?x:null}
 async function readCharFile(f){const buf=await f.arrayBuffer();const head=new TextDecoder().decode(new Uint8Array(buf.slice(0,8))).trim();
   if(head.startsWith('%PDF'))return readCharFromPdf(buf);
@@ -564,7 +565,7 @@ function pickFiles(multi,cb){const inp=h('input',{type:'file',accept:'.json,appl
   inp.addEventListener('change',async()=>{const fs=[...(inp.files||[])];inp.remove();const out=[];for(const f of fs){let ch=null;try{ch=await readCharFile(f)}catch(e){}out.push({f,ch})}cb(out)});inp.click()}
 function noCharModal(names){modal(d=>d.append(h('h2',{},'Kein Charakter gefunden'),h('p',{class:'note'},(names?names+': ':'')+'Importieren lassen sich nur Dateien (.json) und PDFs, die in der Siegelrolle exportiert wurden.'),h('div',{class:'foot'},h('span'),h('button',{class:'btn',type:'button',onclick:closeModal},'Verstanden'))))}
 function importPdf(){pickFiles(false,res=>{const r=res[0];if(!r)return;const ch=r.ch;if(!ch)return noCharModal(r.f.name);
-  const add=asCopy=>{const x=JSON.parse(JSON.stringify(ch));if(asCopy)x.id=uid();const i=S.chars.findIndex(y=>y.id===x.id);if(i>=0)S.chars[i]=x;else S.chars.push(x);S.sel=x.id;S.tab='sheet';S.party=false;S.dm=false;closeModal();save();render();toast('Importiert: '+(x.name||'Charakter'))};
+  const add=asCopy=>{const x=JSON.parse(JSON.stringify(ch));if(asCopy){x.id=uid();delete x.syncKey}else adoptKey(x);const i=S.chars.findIndex(y=>y.id===x.id);if(i>=0)S.chars[i]=x;else S.chars.push(x);S.sel=x.id;S.tab='sheet';S.party=false;S.dm=false;closeModal();save();render();toast('Importiert: '+(x.name||'Charakter'))};
   const ex=S.chars.find(y=>y.id===ch.id);if(!ex)return add(false);
   modal(d=>d.append(h('h2',{},'„'+(ch.name||'Ohne Namen')+'“ ist schon auf deiner Rolle'),h('p',{class:'note'},`Auf deiner Rolle: Stufe ${ex.level}. In der Datei: Stufe ${ch.level}. Ersetzen überschreibt den Charakter auf deiner Rolle mit dem Stand aus der Datei.`),
     h('div',{class:'foot'},h('button',{class:'btn ghost',type:'button',onclick:()=>add(true)},'Als Kopie anlegen'),h('button',{class:'btn',type:'button',onclick:()=>add(false)},'Ersetzen'))))})}
@@ -573,7 +574,7 @@ function dmLoad(){try{const v=JSON.parse(localStorage.getItem(DMK)||'null');if(v
 let DM=dmLoad();
 function dmSave(){try{localStorage.setItem(DMK,JSON.stringify(DM))}catch(e){toast('Konnte nicht im Browser speichern')}}
 function dmAdd(){pickFiles(true,res=>{let n=0,u=0;const bad=[];
-  for(const{f,ch}of res){if(!ch){bad.push(f.name);continue}const x=JSON.parse(JSON.stringify(ch));const i=DM.chars.findIndex(y=>y.id===x.id);if(i>=0){DM.chars[i]=x;u++}else{DM.chars.push(x);n++}DM.added[x.id]=Date.now();if(!S.dmSel)S.dmSel=x.id}
+  for(const{f,ch}of res){if(!ch){bad.push(f.name);continue}const x=JSON.parse(JSON.stringify(ch));delete x.syncKey;const i=DM.chars.findIndex(y=>y.id===x.id);if(i>=0){DM.chars[i]=x;u++}else{DM.chars.push(x);n++}DM.added[x.id]=Date.now();if(!S.dmSel)S.dmSel=x.id}
   dmSave();render();if(n||u)toast((n?n+' neu':'')+(n&&u?', ':'')+(u?u+' aktualisiert':''));if(bad.length)noCharModal(bad.join(', '))})}
 function dmRemove(c){modal(d=>d.append(h('h2',{},'„'+(c.name||'Ohne Namen')+'“ aus der Sammlung nehmen?'),h('p',{class:'note'},'Der Bogen und deine Notizen dazu verschwinden aus dieser Ansicht. Die Datei des Spielers bleibt, wo sie ist.'),
   h('div',{class:'foot'},h('button',{class:'btn ghost',type:'button',onclick:closeModal},'Behalten'),h('button',{class:'btn',type:'button',onclick:()=>{DM.chars=DM.chars.filter(x=>x.id!==c.id);delete DM.notes[c.id];delete DM.added[c.id];if(S.dmSel===c.id)S.dmSel=DM.chars[0]?.id||null;dmSave();closeModal();render();toast('Aus der Sammlung entfernt')}},'Entfernen'))))}
@@ -1006,7 +1007,7 @@ function forceControls(c,cur,apply){const r=c.raceId;const box=h('div',{class:'a
   if(r==='kitsune'){const on=cur&&cur.sub==='moonfolk';box.append(h('span',{class:'note'},'Unterrasse:'),h('button',{class:'btn small'+(on?' ghost':''),type:'button',onclick:()=>apply(on?null:{sub:'moonfolk'})},on?'Moonfolk zurücknehmen':'Moonfolk erzwingen'))}
   else if(r==='hitodama'){const st=cur&&cur.sub==='gashadokuro'?cur.stufe||1:0;box.append(h('span',{class:'note'},'Gashadokuro:'),h('div',{class:'pick'},[0,1,2,3].map(i=>h('button',{class:'pill',type:'button','aria-pressed':String(st===i),onclick:()=>apply(i?{sub:'gashadokuro',stufe:i}:null)},i?'Körperstufe '+['','I','II','III'][i]:'keine'))))}
   else return null;return box}
-async function forceLive(charId,v){store.forced={...(store.forced||{})};if(v)store.forced[charId]=v;else store.forced[charId]={sub:null};render();
+async function forceLive(charId,v){if(store.mode==='drive')return driveForce(charId,v);store.forced={...(store.forced||{})};if(v)store.forced[charId]=v;else store.forced[charId]={sub:null};render();
   try{await store.db.doc('forced/all').set({chars:store.forced,updated:Date.now()});toast(v?'Erzwungen: '+subLabel(v):'Unterrasse zurückgenommen')}catch(e){toast('Speichern ging nicht ('+(e&&e.code||'Fehler')+')')}}
 
 /* race skill proficiencies (Rassen-Dokument) */
@@ -1017,7 +1018,7 @@ function raceSkillPick(raceId,cur,set){const r=RACE_SK[raceId];if(!r||r.fixed)re
   return h('div',{style:'margin-top:14px'},h('h3',{style:'margin:0 0 6px;font-size:18px'},R[raceId].name+': '+r.src+(r.any?' · optional':' · wähle 1')),h('div',{class:'pick'},opts.map(s=>h('button',{class:'pill',type:'button','aria-pressed':String((cur||[]).includes(s)),onclick:()=>set((cur||[]).includes(s)?[]:[s])},s))),r.note?h('p',{class:'note'},r.note):null)}
 /* characters stored in the repository (GitHub Pages) */
 function importChar(ch,src){const ex=S.chars.find(y=>y.id===ch.id);
-  const add=asCopy=>{const x=JSON.parse(JSON.stringify(ch));if(asCopy)x.id=uid();const i=S.chars.findIndex(y=>y.id===x.id);if(i>=0)S.chars[i]=x;else S.chars.push(x);S.sel=x.id;S.tab='sheet';S.party=false;S.dm=false;closeModal();save();render();toast('Geladen: '+(x.name||'Charakter'))};
+  const add=asCopy=>{const x=JSON.parse(JSON.stringify(ch));if(asCopy){x.id=uid();delete x.syncKey}else adoptKey(x);const i=S.chars.findIndex(y=>y.id===x.id);if(i>=0)S.chars[i]=x;else S.chars.push(x);S.sel=x.id;S.tab='sheet';S.party=false;S.dm=false;closeModal();save();render();toast('Geladen: '+(x.name||'Charakter'))};
   if(!ex)return add(false);
   modal(d=>d.append(h('h2',{},'„'+(ch.name||'Ohne Namen')+'“ ist schon auf deiner Rolle'),h('p',{class:'note'},`Auf deiner Rolle: Stufe ${ex.level}. ${src||'Neu'}: Stufe ${ch.level}. Ersetzen überschreibt deinen Stand.`),
     h('div',{class:'foot'},h('button',{class:'btn ghost',type:'button',onclick:closeModal},'Meinen behalten'),h('button',{class:'btn',type:'button',onclick:()=>add(false)},'Ersetzen'))))}
@@ -1028,6 +1029,45 @@ async function loadFromUrl(){let q=null;try{q=new URLSearchParams(location.searc
 async function dmLoadRepo(){try{const r=await fetch('charaktere/index.json',{cache:'no-store'});if(!r.ok)throw 0;const list=await r.json();let n=0;
     for(const e of list){try{const ch=await repoChar(e.file||e);const i=DM.chars.findIndex(y=>y.id===ch.id);if(i>=0)DM.chars[i]=ch;else DM.chars.push(ch);DM.added[ch.id]=Date.now();n++}catch(x){}}
     dmSave();render();toast(n+' Charakter'+(n===1?'':'e')+' aus dem Repo geladen')}catch(e){toast('Keine Charakterliste gefunden. Das geht nur auf der GitHub-Seite.')}}
+/* ---------- Google Drive sync (Apps Script web app) ---------- */
+const DRIVE_URL=String(window.SIEGEL_DRIVE||'').trim();
+const KEYS_LS='siegelrolle-keys',DMPW_LS='siegelrolle-dmpw';
+function lsGet(k,d){try{const v=localStorage.getItem(k);return v?JSON.parse(v):d}catch(e){return d}}
+function lsSet(k,v){try{if(v==null)localStorage.removeItem(k);else localStorage.setItem(k,JSON.stringify(v))}catch(e){}}
+function charKey(id){const ks=lsGet(KEYS_LS,{});if(!ks[id]){ks[id]=uid()+uid()+uid();lsSet(KEYS_LS,ks)}return ks[id]}
+function adoptKey(ch){if(ch&&ch.syncKey){const ks=lsGet(KEYS_LS,{});ks[ch.id]=ch.syncKey;lsSet(KEYS_LS,ks)}if(ch)delete ch.syncKey;return ch}
+async function driveCall(body){const r=await fetch(DRIVE_URL,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify(body),redirect:'follow'});return r.json()}
+const drive={synced:{},timer:null,busy:false,poll:null,partyPoll:null,dmpw:lsGet(DMPW_LS,''),list:null,err:null};
+function driveErr(e){return e==='forbidden'?'<span class="warn">Ein Charakter wurde auf einem anderen Gerät angelegt</span> und wird hier nicht in Drive gespeichert. Importiere ihn über eine Datei von dort.':e==='offline'?'<span class="warn">Drive nicht erreichbar.</span> Gespeichert in diesem Browser, neuer Versuch folgt.':e==='full'?'<span class="warn">Der Drive-Speicher ist voll.</span> Sag dem Spielleiter Bescheid.':'Drive-Fehler: '+e}
+function driveSave(){clearTimeout(drive.timer);drive.timer=setTimeout(driveFlush,2500);setStatus('Speichert in Drive …')}
+async function driveFlush(){if(drive.busy){driveSave();return}drive.busy=true;let err=null,changed=false;store.forced=store.forced||{};
+  for(const c of S.chars){const s=JSON.stringify(c);if(drive.synced[c.id]===s)continue;
+    try{const r=await driveCall({action:'save',id:c.id,key:charKey(c.id),char:c});
+      if(r.ok){drive.synced[c.id]=s;const before=JSON.stringify(store.forced[c.id]||null);if(r.forced)store.forced[c.id]=r.forced;else delete store.forced[c.id];if(before!==JSON.stringify(store.forced[c.id]||null))changed=true}else err=r.error}catch(e){err='offline'}}
+  drive.busy=false;drive.err=err;setStatus(err?driveErr(err):'<b>Gespeichert</b> · beim Spielleiter in Google Drive');if(changed)render();if(err==='offline'){clearTimeout(drive.timer);drive.timer=setTimeout(driveFlush,30000)}}
+async function drivePoll(){if(document.hidden||!S.chars.length)return;let changed=false;store.forced=store.forced||{};
+  for(const c of S.chars){try{const r=await driveCall({action:'get',id:c.id,key:charKey(c.id)});const before=JSON.stringify(store.forced[c.id]||null);
+      if(r.forced)store.forced[c.id]=r.forced;else if(r.ok||r.error==='not_found')delete store.forced[c.id];if(before!==JSON.stringify(store.forced[c.id]||null))changed=true}catch(e){}}
+  if(changed){render();toast('Der Spielleiter hat etwas an deinem Charakter freigeschaltet')}}
+function driveInit(){store.mode='drive';setStatus('Verbindet mit Google Drive …');drive.synced={};driveFlush();drivePoll();drive.poll=setInterval(drivePoll,120000)}
+function driveRemove(id){if(store.mode!=='drive')return;driveCall({action:'remove',id,key:charKey(id)}).catch(()=>{})}
+async function driveForce(id,v){try{const r=await driveCall({action:'force',dm:drive.dmpw,id,value:v});if(!r.ok)throw r;store.forced=r.forced||{};await driveList();toast(v?'Erzwungen: '+subLabel(v):'Unterrasse zurückgenommen')}catch(e){toast('Erzwingen ging nicht ('+(e&&e.error||'offline')+')')}}
+async function driveList(){const r=await driveCall({action:'list',dm:drive.dmpw});if(!r.ok)throw r;drive.list=r.chars||[];store.forced={...(store.forced||{}),...(r.forced||{})};if(S.party)render();return r}
+function drivePartyFill(box){box.textContent='';
+  if(!drive.dmpw){const pw=h('input',{type:'password',id:'dmPw',placeholder:'DM-Passwort','aria-label':'DM-Passwort',autocomplete:'current-password'});const msg=h('p',{class:'note'});
+    const go=async()=>{msg.textContent='Prüft …';try{const r=await driveCall({action:'ping',dm:pw.value});if(r.ok&&r.dm){drive.dmpw=pw.value;lsSet(DMPW_LS,pw.value);msg.textContent='';await driveList();render()}else msg.textContent='Falsches Passwort.'}catch(e){msg.textContent='Drive nicht erreichbar.'}};
+    pw.addEventListener('keydown',e=>{if(e.key==='Enter')go()});
+    box.append(h('div',{class:'vital',style:'grid-column:1/-1;max-width:420px'},h('div',{class:'label'},'Nur für den Spielleiter'),h('p',{class:'note'},'Die Gruppenansicht zeigt alle Charaktere aus deinem Google Drive. Das Passwort prüft dein Skript bei Google, es steht nicht in dieser Seite.'),h('div',{class:'addrow'},pw,h('button',{class:'btn',type:'button',id:'dmPwBtn',onclick:go},'Anmelden')),msg));return}
+  if(!drive.list){box.append(h('p',{class:'note'},'Lädt die Charaktere aus Drive …'));driveList().catch(e=>{if(e&&e.error==='forbidden'){drive.dmpw='';lsSet(DMPW_LS,null)}box.textContent='';box.append(h('p',{class:'note'},e&&e.error==='forbidden'?'Das Passwort stimmt nicht mehr. Bitte neu anmelden.':'Drive nicht erreichbar.'))});return}
+  if(!drive.list.length)box.append(h('p',{class:'note'},'Noch hat niemand einen Charakter angelegt.'));
+  for(const x of drive.list){const c=x.char;if(!c||!C[c.classId]||!R[c.raceId])continue;c.id=c.id||x.id;const cl=C[c.classId];
+    box.append(h('div',{class:'pc'},h('span',{class:'hanko'+(cl.kanji.length>1?' v':'')},cl.kanji.slice(0,2)),h('div',{},h('b',{},c.name||'Ohne Namen'),h('div',{},`${R[c.raceId].name} · ${cl.name} · Stufe ${c.level}`),
+      h('div',{class:'who'},'Zuletzt gespeichert: '+(x.updated?new Date(x.updated).toLocaleString('de-DE'):'—')),subOf(c)?h('div',{class:'who',style:'color:var(--shu)'},'進 '+subLabel(subOf(c))):null,
+      h('div',{class:'addrow',style:'margin-top:6px'},h('button',{class:'btn ghost small',type:'button',onclick:()=>modal(d=>{const sh=pdfSheet(c);sh.style.width='100%';sh.lastChild.remove();d.append(sh,h('div',{class:'foot'},h('button',{class:'btn ghost',type:'button',onclick:()=>{DM.chars=DM.chars.filter(y=>y.id!==c.id);DM.chars.push(JSON.parse(JSON.stringify(c)));DM.added[c.id]=Date.now();dmSave();closeModal();toast('In deine Sammlung übernommen')}},'In Sammlung übernehmen (mit Notizen)'),h('button',{class:'btn',type:'button',onclick:closeModal},'Schließen')))})},'Bogen ansehen')),
+      forceControls(c,subOf(c),v=>driveForce(c.id,v)))))}
+  box.append(h('div',{style:'grid-column:1/-1',class:'addrow'},h('button',{class:'btn ghost small',type:'button',onclick:()=>{drive.list=null;render()}},'⟳ Aktualisieren'),h('button',{class:'btn ghost small',type:'button',onclick:()=>{drive.dmpw='';drive.list=null;lsSet(DMPW_LS,null);render()}},'Abmelden')));
+  clearInterval(drive.partyPoll);drive.partyPoll=setInterval(()=>{if(S.party&&drive.dmpw&&!document.hidden)driveList().catch(()=>{});else clearInterval(drive.partyPoll)},60000)}
+
 function abSel(k,st,draw,c){const s=h('select',{id:'asi-'+k,'aria-label':'Attribut'},h('option',{value:''},'Attribut wählen'),AB.map(a=>{const lim=score(c,a)+(st.asiMode==='one'?2:1)>20;return h('option',{value:a,disabled:lim,selected:st[k]===a},ABN[a]+' ('+score(c,a)+')')}));s.addEventListener('change',()=>{st[k]=s.value;draw()});return s}
 
 /* inventory */
@@ -1338,7 +1378,7 @@ function viewRules(c){const cl=C[c.classId],r=R[c.raceId];const w=h('div');
   return w}
 
 /* party */
-async function viewPartyFill(box){const ids=Object.keys(store.others);let ps={};if(store.user&&ids.length){try{ps=await store.user.profiles(ids)}catch(e){}}
+async function viewPartyFill(box){if(store.mode==='drive')return drivePartyFill(box);const ids=Object.keys(store.others);let ps={};if(store.user&&ids.length){try{ps=await store.user.profiles(ids)}catch(e){}}
   box.textContent='';let n=0;
   for(const id of ids)for(const c of store.others[id]){if(!C[c.classId]||!R[c.raceId])continue;n++;const cl=C[c.classId];
     box.append(h('div',{class:'pc'},h('span',{class:'hanko'+(cl.kanji.length>1?' v':'')},cl.kanji.slice(0,2)),h('div',{},h('b',{},c.name||'Ohne Namen'),h('div',{},`${R[c.raceId].name} · ${cl.name} · Stufe ${c.level}`),
