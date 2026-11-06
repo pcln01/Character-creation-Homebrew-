@@ -234,7 +234,8 @@ details[open]>summary::after{content:"－"}
     <button class="btn" id="newBtn" type="button">＋ Neuer Charakter</button>
     <nav class="roster" id="roster" aria-label="Deine Charaktere"></nav>
     <button class="btn ghost small" id="partyBtn" type="button">団 Gruppe ansehen</button>
-    <button class="btn ghost small" id="importBtn" type="button">⇪ Charakter aus PDF importieren</button>
+    <button class="btn ghost small" id="importBtn" type="button">⇪ Charakter importieren</button>
+    <button class="btn ghost small" id="dmBtn" type="button">観 Sammlung (DM)</button>
     <div class="status" id="status">Lädt …</div>
   </aside>
   <main class="scroll"><div class="inner" id="main"></div></main>
@@ -257,7 +258,7 @@ const sgn=n=>(n>=0?'+':'')+n;
 const prof=l=>2+Math.floor((l-1)/4);
 
 /* ---------- state ---------- */
-let S={chars:[],sel:null,tab:'sheet',party:false};
+let S={chars:[],sel:null,tab:'sheet',party:false,dm:false,dmSel:null};
 let store={mode:'local',db:null,user:null,uid:null,ref:null,writing:false,dirty:false,timer:null,others:{}};
 
 function score(c,a){let s=(+c.base[a]||0)+(R[c.raceId].bonus[a]||0);if((c.raceChoice||[]).includes(a))s+=1;for(const L of c.levels||[])s+=(L.asi&&L.asi[a])||0;return s}
@@ -314,6 +315,7 @@ function renderLines(lines){const out=h('div',{class:'txt'});let tb=null;
 
 /* ---------- views ---------- */
 function render(){renderRoster();const m=$('#main');m.textContent='';
+  if(S.dm){m.append(viewDm());return}
   if(S.party){m.append(viewParty());return}
   const c=cur();if(!c){m.append(viewEmpty());return}
   m.append(viewHead(c));
@@ -325,9 +327,9 @@ function render(){renderRoster();const m=$('#main');m.textContent='';
   p.append(S.tab==='sheet'?viewSheet(c):S.tab==='fight'?viewCombat(c):S.tab==='class'?viewClass(c):S.tab==='grow'?viewGrow(c):S.tab==='inv'?viewInv(c):viewRules(c));m.append(p)}
 
 function renderRoster(){const r=$('#roster');r.textContent='';
-  for(const c of S.chars){const cl=C[c.classId];r.append(h('button',{class:'rbtn',type:'button','aria-current':String(!S.party&&c.id===S.sel),onclick:()=>{S.sel=c.id;S.party=false;render()}},
+  for(const c of S.chars){const cl=C[c.classId];r.append(h('button',{class:'rbtn',type:'button','aria-current':String(!S.party&&!S.dm&&c.id===S.sel),onclick:()=>{S.sel=c.id;S.party=false;S.dm=false;render()}},
     h('span',{class:'hanko'+(cl.kanji.length>1?' v':'')},cl.kanji.slice(0,2)),h('span',{},h('span',{class:'nm'},c.name||'Ohne Namen'),h('span',{class:'sub'},`${R[c.raceId].name} · ${cl.name} · St. ${c.level}`))))}
-  $('#partyBtn').setAttribute('aria-pressed',String(S.party))}
+  $('#partyBtn').setAttribute('aria-pressed',String(S.party));$('#dmBtn').setAttribute('aria-pressed',String(S.dm))}
 
 function viewEmpty(){return h('div',{class:'empty'},
   h('div',{class:'label'},'Noch kein Charakter auf deiner Rolle'),
@@ -340,7 +342,7 @@ function viewHead(c){const cl=C[c.classId],r=R[c.raceId];
   return h('div',{class:'head'},
     h('span',{class:'hanko big'+(cl.kanji.length>2?' v':'')},cl.kanji),
     h('div',{},h('h1',{},c.name||'Ohne Namen'),h('div',{class:'meta'},`${r.name} ${r.kanji} · ${cl.name} · Clan ${c.clan||'—'}`),
-      h('div',{class:'chips'},h('span',{class:'chip shu'},'Hit Die 1d'+cl.hd),h('span',{class:'chip'},'Proficiency '+sgn(prof(c.level))),h('span',{class:'chip'},r.attr.replace('Attribute: ','')),h('button',{class:'btn ghost small',type:'button',id:'exportBtn',style:'margin-left:4px',onclick:()=>exportPdf(c)},'⇩ Als PDF exportieren'))),
+      h('div',{class:'chips'},h('span',{class:'chip shu'},'Hit Die 1d'+cl.hd),h('span',{class:'chip'},'Proficiency '+sgn(prof(c.level))),h('span',{class:'chip'},r.attr.replace('Attribute: ','')),h('button',{class:'btn ghost small',type:'button',id:'exportBtn',style:'margin-left:4px',onclick:()=>exportPdf(c)},'⇩ Als PDF'),h('button',{class:'btn ghost small',type:'button',id:'exportJsonBtn',onclick:()=>exportJson(c)},'⇩ Als Datei'))),
     h('div',{class:'lvl'},h('div',{class:'n'},c.level),h('div',{class:'l'},'Stufe')))}
 
 function viewSheet(c){const cl=C[c.classId];const m=mods(c);const pb=prof(c.level);const w=h('div');
@@ -532,23 +534,61 @@ async function exportPdf(c){toast('PDF wird erstellt …');
     const data=JSON.parse(JSON.stringify(c));
     pdf.setDocumentProperties({title:(c.name||'Charakter')+' · Siegelrolle',subject:PDF_MARK[0]+b64enc(JSON.stringify({v:1,char:data}))+PDF_MARK[1],creator:'Siegelrolle',keywords:'Das gebrochene Siegel'});
     const blob=pdf.output('blob');const fn=(c.name||'Charakter').replace(/[\\/:*?"<>|]+/g,'').trim()+' - Stufe '+c.level+'.pdf';
-    const dl=window.claude&&window.claude.use?await window.claude.use('downloads'):null;
-    if(dl){try{await dl.save({filename:fn,data:blob});toast('PDF gespeichert')}catch(e){toast(e&&e.code==='declined'?'Speichern abgebrochen':'Speichern ging hier nicht ('+(e&&e.code||'Fehler')+')')}}
-    else{const a=h('a',{href:URL.createObjectURL(blob),download:fn});document.body.append(a);a.click();setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove()},4000);toast('PDF gespeichert')}
+    await saveFile(fn,blob,'PDF gespeichert');
   }catch(e){toast('PDF-Export fehlgeschlagen');console.error(e)}finally{host.remove()}}
 function readCharFromPdf(buf){const bytes=new Uint8Array(buf);let s='';for(let i=0;i<bytes.length;i+=0x8000)s+=String.fromCharCode.apply(null,bytes.subarray(i,i+0x8000));
   const re=new RegExp(PDF_MARK[0]+'([A-Za-z0-9+/=\\s\\\\]+?)'+PDF_MARK[1]);const mt=s.match(re);if(!mt)return null;
   try{const o=JSON.parse(b64dec(mt[1].replace(/[\s\\]/g,'')));return o&&o.char&&o.char.raceId&&o.char.classId&&R[o.char.raceId]&&C[o.char.classId]?o.char:null}catch(e){return null}}
-function importPdf(){const inp=h('input',{type:'file',accept:'application/pdf,.pdf',style:'display:none'});document.body.append(inp);
-  inp.addEventListener('change',async()=>{const f=inp.files&&inp.files[0];inp.remove();if(!f)return;
-    let ch=null;try{ch=readCharFromPdf(await f.arrayBuffer())}catch(e){}
-    if(!ch){modal(d=>d.append(h('h2',{},'Kein Charakter gefunden'),h('p',{class:'note'},'Diese PDF enthält keine Siegelrolle-Daten. Importieren lassen sich nur PDFs, die hier mit „Als PDF exportieren“ erstellt wurden.'),h('div',{class:'foot'},h('span'),h('button',{class:'btn',type:'button',onclick:closeModal},'Verstanden'))));return}
-    const add=asCopy=>{const x=JSON.parse(JSON.stringify(ch));if(asCopy)x.id=uid();const i=S.chars.findIndex(y=>y.id===x.id);if(i>=0)S.chars[i]=x;else S.chars.push(x);S.sel=x.id;S.tab='sheet';S.party=false;closeModal();save();render();toast('Importiert: '+(x.name||'Charakter'))};
-    const ex=S.chars.find(y=>y.id===ch.id);
-    if(!ex)return add(false);
-    modal(d=>d.append(h('h2',{},'„'+(ch.name||'Ohne Namen')+'“ ist schon auf deiner Rolle'),h('p',{class:'note'},`Auf deiner Rolle: Stufe ${ex.level}. In der PDF: Stufe ${ch.level}. Ersetzen überschreibt den Charakter auf deiner Rolle mit dem Stand aus der PDF.`),
-      h('div',{class:'foot'},h('button',{class:'btn ghost',type:'button',onclick:()=>add(true)},'Als Kopie anlegen'),h('button',{class:'btn',type:'button',onclick:()=>add(false)},'Ersetzen'))))});
-  inp.click()}
+
+/* file export, import, dm collection */
+async function saveFile(fn,blob,msg){const dl=window.claude&&window.claude.use?await window.claude.use('downloads'):null;
+  if(dl){try{await dl.save({filename:fn,data:blob});toast(msg)}catch(e){toast(e&&e.code==='declined'?'Speichern abgebrochen':'Speichern ging hier nicht ('+(e&&e.code||'Fehler')+')')}return}
+  const a=h('a',{href:URL.createObjectURL(blob),download:fn});document.body.append(a);a.click();setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove()},4000);toast(msg)}
+function fileBase(c){return (c.name||'Charakter').replace(/[\\/:*?"<>|]+/g,'').trim()+' - Stufe '+c.level}
+function exportJson(c){const blob=new Blob([JSON.stringify({app:'siegelrolle',v:1,exported:new Date().toISOString(),char:c})],{type:'application/json'});saveFile(fileBase(c)+'.json',blob,'Datei gespeichert')}
+function validChar(x){return x&&typeof x==='object'&&x.raceId&&x.classId&&R[x.raceId]&&C[x.classId]?x:null}
+async function readCharFile(f){const buf=await f.arrayBuffer();const head=new TextDecoder().decode(new Uint8Array(buf.slice(0,8))).trim();
+  if(head.startsWith('%PDF'))return readCharFromPdf(buf);
+  try{const o=JSON.parse(new TextDecoder().decode(buf));return validChar(o&&o.char?o.char:o)}catch(e){return null}}
+function pickFiles(multi,cb){const inp=h('input',{type:'file',accept:'.json,application/json,.pdf,application/pdf',multiple:multi||null,style:'display:none'});document.body.append(inp);
+  inp.addEventListener('change',async()=>{const fs=[...(inp.files||[])];inp.remove();const out=[];for(const f of fs){let ch=null;try{ch=await readCharFile(f)}catch(e){}out.push({f,ch})}cb(out)});inp.click()}
+function noCharModal(names){modal(d=>d.append(h('h2',{},'Kein Charakter gefunden'),h('p',{class:'note'},(names?names+': ':'')+'Importieren lassen sich nur Dateien (.json) und PDFs, die in der Siegelrolle exportiert wurden.'),h('div',{class:'foot'},h('span'),h('button',{class:'btn',type:'button',onclick:closeModal},'Verstanden'))))}
+function importPdf(){pickFiles(false,res=>{const r=res[0];if(!r)return;const ch=r.ch;if(!ch)return noCharModal(r.f.name);
+  const add=asCopy=>{const x=JSON.parse(JSON.stringify(ch));if(asCopy)x.id=uid();const i=S.chars.findIndex(y=>y.id===x.id);if(i>=0)S.chars[i]=x;else S.chars.push(x);S.sel=x.id;S.tab='sheet';S.party=false;S.dm=false;closeModal();save();render();toast('Importiert: '+(x.name||'Charakter'))};
+  const ex=S.chars.find(y=>y.id===ch.id);if(!ex)return add(false);
+  modal(d=>d.append(h('h2',{},'„'+(ch.name||'Ohne Namen')+'“ ist schon auf deiner Rolle'),h('p',{class:'note'},`Auf deiner Rolle: Stufe ${ex.level}. In der Datei: Stufe ${ch.level}. Ersetzen überschreibt den Charakter auf deiner Rolle mit dem Stand aus der Datei.`),
+    h('div',{class:'foot'},h('button',{class:'btn ghost',type:'button',onclick:()=>add(true)},'Als Kopie anlegen'),h('button',{class:'btn',type:'button',onclick:()=>add(false)},'Ersetzen'))))})}
+const DMK='siegelrolle-dm';
+function dmLoad(){try{const v=JSON.parse(localStorage.getItem(DMK)||'null');if(v&&Array.isArray(v.chars))return{chars:v.chars,notes:v.notes||{},added:v.added||{}}}catch(e){}return{chars:[],notes:{},added:{}}}
+let DM=dmLoad();
+function dmSave(){try{localStorage.setItem(DMK,JSON.stringify(DM))}catch(e){toast('Konnte nicht im Browser speichern')}}
+function dmAdd(){pickFiles(true,res=>{let n=0,u=0;const bad=[];
+  for(const{f,ch}of res){if(!ch){bad.push(f.name);continue}const x=JSON.parse(JSON.stringify(ch));const i=DM.chars.findIndex(y=>y.id===x.id);if(i>=0){DM.chars[i]=x;u++}else{DM.chars.push(x);n++}DM.added[x.id]=Date.now();if(!S.dmSel)S.dmSel=x.id}
+  dmSave();render();if(n||u)toast((n?n+' neu':'')+(n&&u?', ':'')+(u?u+' aktualisiert':''));if(bad.length)noCharModal(bad.join(', '))})}
+function dmRemove(c){modal(d=>d.append(h('h2',{},'„'+(c.name||'Ohne Namen')+'“ aus der Sammlung nehmen?'),h('p',{class:'note'},'Der Bogen und deine Notizen dazu verschwinden aus dieser Ansicht. Die Datei des Spielers bleibt, wo sie ist.'),
+  h('div',{class:'foot'},h('button',{class:'btn ghost',type:'button',onclick:closeModal},'Behalten'),h('button',{class:'btn',type:'button',onclick:()=>{DM.chars=DM.chars.filter(x=>x.id!==c.id);delete DM.notes[c.id];delete DM.added[c.id];if(S.dmSel===c.id)S.dmSel=DM.chars[0]?.id||null;dmSave();closeModal();render();toast('Aus der Sammlung entfernt')}},'Entfernen'))))}
+function viewDm(){const w=h('div');
+  w.append(h('div',{class:'label'},'観 · Sammlung'),h('h1',{style:'font-size:32px;margin:6px 0 6px'},'Importierte Charakterbögen'),
+    h('p',{class:'note',style:'margin-bottom:14px'},'Lade hier die Dateien oder PDFs deiner Spieler. Lädst du einen Bogen erneut, wird er aktualisiert; deine Notizen bleiben. Alles bleibt nur in diesem Browser.'),
+    h('div',{class:'addrow',style:'margin-bottom:18px'},h('button',{class:'btn',type:'button',id:'dmAddBtn',onclick:dmAdd},'＋ Bögen hinzufügen')));
+  if(!DM.chars.length){w.append(h('p',{class:'note'},'Noch keine Bögen in der Sammlung.'));return w}
+  if(!DM.chars.find(x=>x.id===S.dmSel))S.dmSel=DM.chars[0].id;
+  const list=h('div',{class:'party',style:'margin-bottom:22px'});
+  for(const c of DM.chars){const cl=C[c.classId],r=R[c.raceId];if(!cl||!r)continue;const on=c.id===S.dmSel;const note=(DM.notes[c.id]||'').trim();
+    list.append(h('button',{class:'pc',type:'button',style:'text-align:left;cursor:pointer;font:inherit;color:inherit'+(on?';outline:2px solid var(--shu)':''),'aria-pressed':String(on),onclick:()=>{S.dmSel=c.id;render()}},
+      h('span',{class:'hanko'+(cl.kanji.length>1?' v':'')},cl.kanji.slice(0,2)),h('div',{},h('b',{},c.name||'Ohne Namen'),h('div',{},`${r.name} · ${cl.name} · Stufe ${c.level}`),
+        h('div',{class:'who'},note?'✎ '+note.slice(0,40)+(note.length>40?' …':''):'Noch keine Notiz'))))}
+  w.append(list);
+  const c=DM.chars.find(x=>x.id===S.dmSel);if(!c)return w;
+  const ta=h('textarea',{id:'dmNote',rows:'6',style:'width:100%;padding:10px;border:1px solid var(--line);border-radius:3px;background:var(--paper);color:var(--sumi);font:inherit','aria-label':'DM-Notizen zu '+(c.name||'diesem Charakter'),placeholder:'Was du dir zu diesem Charakter merken willst: Geheimnisse, Haken, offene Fäden …'});ta.value=DM.notes[c.id]||'';
+  let t;ta.addEventListener('input',()=>{DM.notes[c.id]=ta.value;clearTimeout(t);t=setTimeout(dmSave,300)});ta.addEventListener('blur',()=>{DM.notes[c.id]=ta.value;dmSave()});
+  w.append(sec('記','DM-Notizen zu '+(c.name||'Ohne Namen'),ta,h('p',{class:'note'},'Wird in diesem Browser gespeichert und gehört nicht zum Bogen. Beim Export gehen sie nicht an den Spieler.')));
+  const sheetWrap=h('div',{style:'overflow-x:auto;border:1px solid var(--line);border-radius:var(--r)'});const sh=pdfSheet(c);sh.style.width='100%';sh.style.maxWidth='794px';sh.lastChild.remove();sheetWrap.append(sh);
+  w.append(sec('書','Bogen',sheetWrap,h('div',{class:'addrow',style:'margin-top:12px'},
+    h('span',{class:'note'},DM.added[c.id]?'Zuletzt geladen: '+new Date(DM.added[c.id]).toLocaleString('de-DE'):''),
+    h('button',{class:'btn ghost small',type:'button',onclick:()=>exportPdf(c)},'⇩ Als PDF'),
+    h('button',{class:'btn ghost small',type:'button',onclick:()=>dmRemove(c)},'Aus der Sammlung nehmen'))));
+  return w}
 
 function abSel(k,st,draw,c){const s=h('select',{id:'asi-'+k,'aria-label':'Attribut'},h('option',{value:''},'Attribut wählen'),AB.map(a=>{const lim=score(c,a)+(st.asiMode==='one'?2:1)>20;return h('option',{value:a,disabled:lim,selected:st[k]===a},ABN[a]+' ('+score(c,a)+')')}));s.addEventListener('change',()=>{st[k]=s.value;draw()});return s}
 
@@ -908,7 +948,8 @@ function create(st){const c={id:uid(),name:st.name.trim(),raceId:st.raceId,class
   classStepApply(c,st);profStepApply(c,st);c.hp=hpMax(c);c.soul=soulMax(c);S.chars.push(c);S.sel=c.id;S.tab='sheet';S.party=false;closeModal();if(st.gear)addCommon(c);else{save();render()}toast('Siegel gesetzt: '+c.name)}
 
 $('#newBtn').addEventListener('click',openCreate);
-$('#partyBtn').addEventListener('click',()=>{S.party=!S.party;render()});
+$('#partyBtn').addEventListener('click',()=>{S.party=!S.party;S.dm=false;render()});
+$('#dmBtn').addEventListener('click',()=>{S.dm=!S.dm;S.party=false;render()});
 $('#importBtn').addEventListener('click',importPdf);
 initStore();
 </script>

@@ -10,11 +10,12 @@ Web-App zum Erstellen und Verwalten von Charakteren für die Homebrew-Kampagne �
 - Aufstieg mit Hit Points, Ability Score Improvements, Mitama-Banden und den Klassenwahlen jeder Stufe
 - Kampfwerte, Klassen-Ressourcen, Short Rest, Long Rest und Schreinbesuch
 - Inventar mit Gewicht und Traglast
-- Export als PDF und Import aus einer exportierten PDF
+- Export als kleine Datei (.json) oder als PDF; beides lässt sich wieder importieren
+- Sammlung für den Spielleiter: importierte Bögen der Spieler ansehen und zu jedem Charakter eigene Notizen schreiben
 
 ## Speicherung
 
-Charaktere werden im Browser gespeichert (localStorage). Zum Sichern oder Weitergeben einen Charakter als PDF exportieren; die PDF enthält alle Daten und lässt sich wieder importieren.
+Charaktere, die Sammlung und die DM-Notizen werden nur im Browser gespeichert (localStorage). Spieler schicken dem Spielleiter ihren Charakter als Datei (.json) oder PDF; beides enthält alle Daten. DM-Notizen gehören nicht zum Bogen und werden nicht mit exportiert.
 
 ## Aufbau
 
