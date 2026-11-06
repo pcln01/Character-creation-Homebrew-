@@ -333,7 +333,7 @@ function render(){renderRoster();const m=$('#main');m.textContent='';
 
 function renderRoster(){const r=$('#roster');r.textContent='';
   for(const c of S.chars){const cl=C[c.classId];r.append(h('button',{class:'rbtn',type:'button','aria-current':String(!S.party&&!S.dm&&c.id===S.sel),onclick:()=>{S.sel=c.id;S.party=false;S.dm=false;render()}},
-    h('span',{class:'hanko'+(cl.kanji.length>1?' v':'')},cl.kanji.slice(0,2)),h('span',{},h('span',{class:'nm'},c.name||'Ohne Namen'),h('span',{class:'sub'},`${R[c.raceId].name} · ${cl.name} · St. ${c.level}`))))}
+    h('span',{class:'hanko'+(cl.kanji.length>1?' v':'')},cl.kanji.slice(0,2)),h('span',{},h('span',{class:'nm'},(isActive(c)?'● ':'')+(c.name||'Ohne Namen')),h('span',{class:'sub'},`${R[c.raceId].name} · ${cl.name} · St. ${c.level}`+(isActive(c)?' · aktiv':'')))))}
   $('#partyBtn').setAttribute('aria-pressed',String(S.party));$('#dmBtn').setAttribute('aria-pressed',String(S.dm))}
 
 function viewEmpty(){return h('div',{class:'empty'},
@@ -347,7 +347,7 @@ function viewHead(c){const cl=C[c.classId],r=R[c.raceId];
   return h('div',{class:'head'},
     h('span',{class:'hanko big'+(cl.kanji.length>2?' v':'')},cl.kanji),
     h('div',{},h('h1',{},c.name||'Ohne Namen'),h('div',{class:'meta'},`${r.name} ${r.kanji} · ${cl.name} · Clan ${c.clan||'—'}`),
-      h('div',{class:'chips'},h('span',{class:'chip shu'},'Hit Die 1d'+cl.hd),subOf(c)?h('span',{class:'chip shu'},'進 '+subLabel(subOf(c))):null,c.classId==='hanyo'?h('span',{class:'chip shu'},'妖 Yokai-Grad '+hanyoGrad(c).open+(hanyoGrad(c).back?' · '+hanyoGrad(c).back+' zurück':'')):null,h('span',{class:'chip'},'Proficiency '+sgn(prof(c.level))),h('span',{class:'chip'},r.attr.replace('Attribute: ','')),h('button',{class:'btn ghost small',type:'button',id:'exportBtn',style:'margin-left:4px',onclick:()=>exportPdf(c)},'⇩ Als PDF'),h('button',{class:'btn ghost small',type:'button',id:'exportJsonBtn',onclick:()=>exportJson(c)},'⇩ Als Datei'))),
+      h('div',{class:'chips'},h('span',{class:'chip shu'},'Hit Die 1d'+cl.hd),subOf(c)?h('span',{class:'chip shu'},'進 '+subLabel(subOf(c))):null,c.classId==='hanyo'?h('span',{class:'chip shu'},'妖 Yokai-Grad '+hanyoGrad(c).open+(hanyoGrad(c).back?' · '+hanyoGrad(c).back+' zurück':'')):null,h('span',{class:'chip'},'Proficiency '+sgn(prof(c.level))),h('span',{class:'chip'},r.attr.replace('Attribute: ','')),h('button',{class:'btn ghost small',type:'button',id:'exportBtn',style:'margin-left:4px',onclick:()=>exportPdf(c)},'⇩ Als PDF'),h('button',{class:'btn ghost small',type:'button',id:'exportJsonBtn',onclick:()=>exportJson(c)},'⇩ Als Datei'),activeChip(c))),
     h('div',{class:'lvl'},h('div',{class:'n'},c.level),h('div',{class:'l'},'Stufe')))}
 
 function viewSheet(c){const cl=C[c.classId];const m=mods(c);const pb=prof(c.level);const w=h('div');
@@ -1037,19 +1037,24 @@ function lsSet(k,v){try{if(v==null)localStorage.removeItem(k);else localStorage.
 function charKey(id){const ks=lsGet(KEYS_LS,{});if(!ks[id]){ks[id]=uid()+uid()+uid();lsSet(KEYS_LS,ks)}return ks[id]}
 function adoptKey(ch){if(ch&&ch.syncKey){const ks=lsGet(KEYS_LS,{});ks[ch.id]=ch.syncKey;lsSet(KEYS_LS,ks)}if(ch)delete ch.syncKey;return ch}
 async function driveCall(body){const r=await fetch(DRIVE_URL,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify(body),redirect:'follow'});return r.json()}
+const ACT_LS='siegelrolle-active';
+function activeId(){let a=lsGet(ACT_LS,null);if(!S.chars.find(c=>c.id===a)){a=S.chars[0]?S.chars[0].id:null;lsSet(ACT_LS,a)}return a}
+function isActive(c){return store.mode==='drive'&&c.id===activeId()}
+function setActive(id){const old=activeId();if(old===id)return;lsSet(ACT_LS,id);if(store.mode==='drive'){if(old)driveRemove(old);delete drive.synced[id];driveFlush()}render();const c=S.chars.find(x=>x.id===id);toast((c&&c.name||'Charakter')+' ist jetzt dein aktiver Charakter')}
+function activeChip(c){if(store.mode!=='drive')return null;return isActive(c)?h('span',{class:'chip shu',title:'Nur dieser Charakter wird an den Spielleiter gesendet'},'● Aktiv · beim Spielleiter'):h('button',{class:'btn ghost small',type:'button',id:'setActiveBtn',onclick:()=>setActive(c.id)},'Als aktiven Charakter setzen')}
 const drive={synced:{},timer:null,busy:false,poll:null,partyPoll:null,dmpw:lsGet(DMPW_LS,''),list:null,err:null};
 function driveErr(e){return e==='forbidden'?'<span class="warn">Ein Charakter wurde auf einem anderen Gerät angelegt</span> und wird hier nicht in Drive gespeichert. Importiere ihn über eine Datei von dort.':e==='offline'?'<span class="warn">Drive nicht erreichbar.</span> Gespeichert in diesem Browser, neuer Versuch folgt.':e==='full'?'<span class="warn">Der Drive-Speicher ist voll.</span> Sag dem Spielleiter Bescheid.':'Drive-Fehler: '+e}
 function driveSave(){clearTimeout(drive.timer);drive.timer=setTimeout(driveFlush,2500);setStatus('Speichert in Drive …')}
 async function driveFlush(){if(drive.busy){driveSave();return}drive.busy=true;let err=null,changed=false;store.forced=store.forced||{};
-  for(const c of S.chars){const s=JSON.stringify(c);if(drive.synced[c.id]===s)continue;
+  for(const c of S.chars.filter(c=>c.id===activeId())){const s=JSON.stringify(c);if(drive.synced[c.id]===s)continue;
     try{const r=await driveCall({action:'save',id:c.id,key:charKey(c.id),char:c});
       if(r.ok){drive.synced[c.id]=s;const before=JSON.stringify(store.forced[c.id]||null);if(r.forced)store.forced[c.id]=r.forced;else delete store.forced[c.id];if(before!==JSON.stringify(store.forced[c.id]||null))changed=true}else err=r.error}catch(e){err='offline'}}
-  drive.busy=false;drive.err=err;setStatus(err?driveErr(err):'<b>Gespeichert</b> · beim Spielleiter in Google Drive');if(changed)render();if(err==='offline'){clearTimeout(drive.timer);drive.timer=setTimeout(driveFlush,30000)}}
+  drive.busy=false;drive.err=err;const ac=S.chars.find(c=>c.id===activeId());setStatus(err?driveErr(err):ac?'<b>Gespeichert</b> · „'+(ac.name||'Ohne Namen')+'“ ist beim Spielleiter in Google Drive':'Noch kein Charakter für den Spielleiter.');if(changed)render();if(err==='offline'){clearTimeout(drive.timer);drive.timer=setTimeout(driveFlush,30000)}}
 async function drivePoll(){if(document.hidden||!S.chars.length)return;let changed=false;store.forced=store.forced||{};
-  for(const c of S.chars){try{const r=await driveCall({action:'get',id:c.id,key:charKey(c.id)});const before=JSON.stringify(store.forced[c.id]||null);
+  for(const c of S.chars.filter(c=>c.id===activeId())){try{const r=await driveCall({action:'get',id:c.id,key:charKey(c.id)});const before=JSON.stringify(store.forced[c.id]||null);
       if(r.forced)store.forced[c.id]=r.forced;else if(r.ok||r.error==='not_found')delete store.forced[c.id];if(before!==JSON.stringify(store.forced[c.id]||null))changed=true}catch(e){}}
   if(changed){render();toast('Der Spielleiter hat etwas an deinem Charakter freigeschaltet')}}
-function driveInit(){store.mode='drive';setStatus('Verbindet mit Google Drive …');drive.synced={};driveFlush();drivePoll();drive.poll=setInterval(drivePoll,120000)}
+function driveInit(){store.mode='drive';setStatus('Verbindet mit Google Drive …');drive.synced={};const a=activeId();for(const c of S.chars)if(c.id!==a)driveRemove(c.id);render();driveFlush();drivePoll();drive.poll=setInterval(drivePoll,120000)}
 function driveRemove(id){if(store.mode!=='drive')return;driveCall({action:'remove',id,key:charKey(id)}).catch(()=>{})}
 async function driveForce(id,v){try{const r=await driveCall({action:'force',dm:drive.dmpw,id,value:v});if(!r.ok)throw r;store.forced=r.forced||{};await driveList();toast(v?'Erzwungen: '+subLabel(v):'Unterrasse zurückgenommen')}catch(e){toast('Erzwingen ging nicht ('+(e&&e.error||'offline')+')')}}
 async function driveList(){const r=await driveCall({action:'list',dm:drive.dmpw});if(!r.ok)throw r;drive.list=r.chars||[];store.forced={...(store.forced||{}),...(r.forced||{})};if(S.party)render();return r}
