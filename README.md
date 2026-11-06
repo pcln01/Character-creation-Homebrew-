@@ -10,6 +10,7 @@ Web-App zum Erstellen und Verwalten von Charakteren für die Homebrew-Kampagne �
 - Aufstieg mit Hit Points, Ability Score Improvements, Mitama-Banden und den Klassenwahlen jeder Stufe
 - Kampfwerte, Klassen-Ressourcen, Short Rest, Long Rest und Schreinbesuch
 - Kampfseite je Klasse zum Live-Mitführen: Beute, Griffe und Jagdbuch-Boni, Kata und Eide, Bürde und Niō-Gestalt, Seelenrituale und Talismane, kanalisierter Gott, das Rad, Pakte und Yōki, Strophen und Widerhalle
+- Onmyōji Wheelbreaker: fremde Zauber aus der SRD-5.2-Liste wählen (Erschaffung, Aufstieg, Klasse) und „Wirken auf gut Glück“: Ergebnis des 1d100 wählen, die App führt es aus
 - Nutzungen der Rassenfähigkeiten (pro Short/Long Rest) direkt aus den Rassen-Dokumenten
 - Yokai Hunter: Jagdbuch und Gegenmittel-Beutel im Inventar, Brauen beim Long Rest
 - Inventar mit Gewicht und Traglast
@@ -23,3 +24,7 @@ Charaktere, die Sammlung und die DM-Notizen werden nur im Browser gespeichert (l
 ## Aufbau
 
 Eine einzelne Datei: `index.html`. Keine Installation, kein Build. Der PDF-Export lädt html2canvas und jsPDF von cdnjs.
+
+## Lizenzhinweis
+
+Diese App enthält Material aus dem System Reference Document 5.2 („SRD 5.2“) von Wizards of the Coast LLC, verfügbar unter https://www.dndbeyond.com/srd. Das SRD 5.2 ist lizenziert unter der Creative Commons Attribution 4.0 International License (https://creativecommons.org/licenses/by/4.0/legalcode). Die Zauberdaten stammen aus dem Projekt 5e-bits/5e-database.
