@@ -22,7 +22,7 @@ Web-App zum Erstellen und Verwalten von Charakteren für die Homebrew-Kampagne �
 
 Fertige Charaktere liegen im Ordner `charaktere/` (Format wie der Datei-Export) und sind in `charaktere/index.json` eingetragen.
 
-- Spieler laden ihren Charakter über einen Link: `https://pcln01.github.io/Character-creation-Homebrew-/?char=ryo`
+- Spieler laden ihren Charakter über einen Link: `https://pcln01.github.io/Character-creation-Homebrew-/?char=<dateiname>`
 - Der Spielleiter lädt in der Sammlung mit „Charaktere der Runde laden“ alle auf einmal.
 
 ## Speicherung
