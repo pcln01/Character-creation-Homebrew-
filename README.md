@@ -11,6 +11,7 @@ Web-App zum Erstellen und Verwalten von Charakteren für die Homebrew-Kampagne �
 - Kampfwerte, Klassen-Ressourcen, Short Rest, Long Rest und Schreinbesuch
 - Kampfseite je Klasse zum Live-Mitführen: Beute, Griffe und Jagdbuch-Boni, Kata und Eide, Bürde und Niō-Gestalt, Seelenrituale und Talismane, kanalisierter Gott, das Rad, Pakte und Yōki, Strophen und Widerhalle
 - Onmyōji Wheelbreaker: fremde Zauber aus der SRD-5.2-Liste wählen (Erschaffung, Aufstieg, Klasse) und „Wirken auf gut Glück“: Ergebnis des 1d100 wählen, die App führt es aus
+- Unterrassen (Kitsune: Moonfolk, Hitodama: Gashadokuro), vom Spielleiter in der Sammlung freigeschaltet und als Datei an den Spieler zurückgegeben
 - Nutzungen der Rassenfähigkeiten (pro Short/Long Rest) direkt aus den Rassen-Dokumenten
 - Yokai Hunter: Jagdbuch und Gegenmittel-Beutel im Inventar, Brauen beim Long Rest
 - Inventar mit Gewicht und Traglast
