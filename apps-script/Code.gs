@@ -22,6 +22,7 @@ function doPost(e) {
       case 'get': return antwort(holen(req));
       case 'remove': return antwort(entfernen(req));
       case 'list': return antwort(liste(req));
+      case 'roster': return antwort(gruppe());
       case 'force': return antwort(erzwingen(req));
       default: return antwort({ ok: false, error: 'unknown_action' });
     }
@@ -127,8 +128,16 @@ function entfernen(req) {
   return { ok: true };
 }
 
+function gruppe() {
+  return { ok: true, chars: alleCharaktere(), forced: erzwungen() };
+}
+
 function liste(req) {
   if (!istDm(req)) return { ok: false, error: 'forbidden' };
+  return { ok: true, chars: alleCharaktere(), forced: erzwungen() };
+}
+
+function alleCharaktere() {
   const out = [];
   const it = ordner().getFiles();
   while (it.hasNext()) {
@@ -140,14 +149,15 @@ function liste(req) {
       out.push({ id: n.slice(0, -5), char: o.char, updated: o.updated });
     } catch (x) {}
   }
-  return { ok: true, chars: out, forced: erzwungen() };
+  return out;
 }
 
 function erzwingen(req) {
   if (!istDm(req)) return { ok: false, error: 'forbidden' };
   if (!gueltigeId(req.id)) return { ok: false, error: 'bad_request' };
   const m = erzwungen();
-  m[req.id] = req.value && req.value.sub ? req.value : { sub: null };
+  if (req.value && typeof req.value === 'object' && JSON.stringify(req.value).length > 100000) return { ok: false, error: 'too_large' };
+  m[req.id] = req.value && typeof req.value === 'object' ? req.value : { sub: null };
   schreiben('_erzwungen.json', m);
   return { ok: true, forced: m };
 }

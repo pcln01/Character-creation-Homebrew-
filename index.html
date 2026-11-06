@@ -292,7 +292,7 @@ async function initStore(){
   store.db=db;store.user=user;store.uid=user?await user.id():null;
   if(!db||!store.uid){setStatus('Gespeichert nur in diesem Browser (nicht angemeldet).');return}
   store.ref=db.doc('characters/'+store.uid);store.mode='db';try{store.owner=user?await user.isOwner():false}catch(e){store.owner=false}
-  db.doc('forced/all').onSnapshot(s=>{store.forced=(s.exists&&s.data()&&s.data().chars)||{};render()},()=>{});
+  db.doc('forced/all').onSnapshot(s=>{store.forced=(s.exists&&s.data()&&s.data().chars)||{};deliverDm();render()},()=>{});
   let got=false;const t=setTimeout(()=>{if(!got)setStatus('Die gemeinsame Rolle antwortet noch nicht. Änderungen bleiben vorerst in diesem Browser.')},10000);
   store.ref.onSnapshot(snap=>{
     if(!snap.metadata.fromCache){got=true;clearTimeout(t)}
@@ -376,6 +376,7 @@ function viewSheet(c){const cl=C[c.classId];const m=mods(c);const pb=prof(c.leve
     nb.append(h('div',{class:'fields',style:'margin-bottom:10px'},h('div',{class:'field'},h('label',{for:'sn3-'+i},n.rel||REL3[i]),a),h('div',{class:'field'},h('label',{for:'sn3w-'+i},'Notiz'),b)))});
     w.append(sec('縁','Wen du kennst',nb))}
   {const sv=subView(c);if(sv)w.append(sec('進','Unterrasse · '+subLabel(subOf(c)),sv))}
+  {const dv=dmView(c);if(dv)w.append(sec('師','Vom Spielleiter',dv))}
   w.append(sec('記','Notizen',notes));
   const del=h('div',{class:'foot'},h('span',{class:'note'},'Charakter-ID '+c.id),h('button',{class:'btn ghost small',type:'button',onclick:()=>confirmDel(c)},'Charakter löschen'));
   w.append(del);return w}
@@ -565,7 +566,7 @@ function pickFiles(multi,cb){const inp=h('input',{type:'file',accept:'.json,appl
   inp.addEventListener('change',async()=>{const fs=[...(inp.files||[])];inp.remove();const out=[];for(const f of fs){let ch=null;try{ch=await readCharFile(f)}catch(e){}out.push({f,ch})}cb(out)});inp.click()}
 function noCharModal(names){modal(d=>d.append(h('h2',{},'Kein Charakter gefunden'),h('p',{class:'note'},(names?names+': ':'')+'Importieren lassen sich nur Dateien (.json) und PDFs, die in der Siegelrolle exportiert wurden.'),h('div',{class:'foot'},h('span'),h('button',{class:'btn',type:'button',onclick:closeModal},'Verstanden'))))}
 function importPdf(){pickFiles(false,res=>{const r=res[0];if(!r)return;const ch=r.ch;if(!ch)return noCharModal(r.f.name);
-  const add=asCopy=>{const x=JSON.parse(JSON.stringify(ch));if(asCopy){x.id=uid();delete x.syncKey}else adoptKey(x);const i=S.chars.findIndex(y=>y.id===x.id);if(i>=0)S.chars[i]=x;else S.chars.push(x);S.sel=x.id;S.tab='sheet';S.party=false;S.dm=false;closeModal();save();render();toast('Importiert: '+(x.name||'Charakter'))};
+  const add=asCopy=>{const x=JSON.parse(JSON.stringify(ch));if(asCopy){x.id=uid();delete x.syncKey}else adoptKey(x);const i=S.chars.findIndex(y=>y.id===x.id);if(i>=0)S.chars[i]=x;else S.chars.push(x);S.sel=x.id;S.tab='sheet';S.party=false;S.dm=false;closeModal();save();render();deliverDm();toast('Importiert: '+(x.name||'Charakter'))};
   const ex=S.chars.find(y=>y.id===ch.id);if(!ex)return add(false);
   modal(d=>d.append(h('h2',{},'„'+(ch.name||'Ohne Namen')+'“ ist schon auf deiner Rolle'),h('p',{class:'note'},`Auf deiner Rolle: Stufe ${ex.level}. In der Datei: Stufe ${ch.level}. Ersetzen überschreibt den Charakter auf deiner Rolle mit dem Stand aus der Datei.`),
     h('div',{class:'foot'},h('button',{class:'btn ghost',type:'button',onclick:()=>add(true)},'Als Kopie anlegen'),h('button',{class:'btn',type:'button',onclick:()=>add(false)},'Ersetzen'))))})}
@@ -578,30 +579,6 @@ function dmAdd(){pickFiles(true,res=>{let n=0,u=0;const bad=[];
   dmSave();render();if(n||u)toast((n?n+' neu':'')+(n&&u?', ':'')+(u?u+' aktualisiert':''));if(bad.length)noCharModal(bad.join(', '))})}
 function dmRemove(c){modal(d=>d.append(h('h2',{},'„'+(c.name||'Ohne Namen')+'“ aus der Sammlung nehmen?'),h('p',{class:'note'},'Der Bogen und deine Notizen dazu verschwinden aus dieser Ansicht. Die Datei des Spielers bleibt, wo sie ist.'),
   h('div',{class:'foot'},h('button',{class:'btn ghost',type:'button',onclick:closeModal},'Behalten'),h('button',{class:'btn',type:'button',onclick:()=>{DM.chars=DM.chars.filter(x=>x.id!==c.id);delete DM.notes[c.id];delete DM.added[c.id];if(S.dmSel===c.id)S.dmSel=DM.chars[0]?.id||null;dmSave();closeModal();render();toast('Aus der Sammlung entfernt')}},'Entfernen'))))}
-function viewDm(){const w=h('div');
-  w.append(h('div',{class:'label'},'観 · Sammlung'),h('h1',{style:'font-size:32px;margin:6px 0 6px'},'Importierte Charakterbögen'),
-    h('p',{class:'note',style:'margin-bottom:14px'},'Lade hier die Dateien oder PDFs deiner Spieler. Lädst du einen Bogen erneut, wird er aktualisiert; deine Notizen bleiben. Alles bleibt nur in diesem Browser.'),
-    h('div',{class:'addrow',style:'margin-bottom:18px'},h('button',{class:'btn',type:'button',id:'dmAddBtn',onclick:dmAdd},'＋ Bögen hinzufügen'),h('button',{class:'btn ghost',type:'button',id:'dmRepoBtn',onclick:dmLoadRepo},'⟳ Charaktere der Runde laden')));
-  if(!DM.chars.length){w.append(h('p',{class:'note'},'Noch keine Bögen in der Sammlung.'));return w}
-  if(!DM.chars.find(x=>x.id===S.dmSel))S.dmSel=DM.chars[0].id;
-  const list=h('div',{class:'party',style:'margin-bottom:22px'});
-  for(const c of DM.chars){const cl=C[c.classId],r=R[c.raceId];if(!cl||!r)continue;const on=c.id===S.dmSel;const note=(DM.notes[c.id]||'').trim();
-    list.append(h('button',{class:'pc',type:'button',style:'text-align:left;cursor:pointer;font:inherit;color:inherit'+(on?';outline:2px solid var(--shu)':''),'aria-pressed':String(on),onclick:()=>{S.dmSel=c.id;render()}},
-      h('span',{class:'hanko'+(cl.kanji.length>1?' v':'')},cl.kanji.slice(0,2)),h('div',{},h('b',{},c.name||'Ohne Namen'),h('div',{},`${r.name} · ${cl.name} · Stufe ${c.level}`),
-        h('div',{class:'who'},note?'✎ '+note.slice(0,40)+(note.length>40?' …':''):'Noch keine Notiz'))))}
-  w.append(list);
-  {const cc=DM.chars.find(x=>x.id===S.dmSel);const fc=cc&&forceControls(cc,cc.sub||null,v=>{const x=DM.chars.find(y=>y.id===cc.id);x.sub=v;dmSave();render();toast(v?'Unterrasse gesetzt: '+subLabel(v)+'. Exportiere die Datei für den Spieler.':'Unterrasse zurückgenommen')});if(fc)w.append(sec('進','Unterrasse für '+(cc.name||'diesen Charakter'),fc,h('div',{class:'addrow',style:'margin-top:8px'},h('button',{class:'btn ghost small',type:'button',onclick:()=>exportJson(cc)},'⇩ Datei für den Spieler exportieren')),h('p',{class:'note'},'Ohne gemeinsamen Speicher bekommt der Spieler die Änderung über diese Datei: Er importiert sie mit „Charakter importieren → Ersetzen“.'+(store.mode==='db'?' Live geht es über „Gruppe ansehen“.':''))))}
-  const c=DM.chars.find(x=>x.id===S.dmSel);if(!c)return w;
-  const ta=h('textarea',{id:'dmNote',rows:'6',style:'width:100%;padding:10px;border:1px solid var(--line);border-radius:3px;background:var(--paper);color:var(--sumi);font:inherit','aria-label':'DM-Notizen zu '+(c.name||'diesem Charakter'),placeholder:'Was du dir zu diesem Charakter merken willst: Geheimnisse, Haken, offene Fäden …'});ta.value=DM.notes[c.id]||'';
-  let t;ta.addEventListener('input',()=>{DM.notes[c.id]=ta.value;clearTimeout(t);t=setTimeout(dmSave,300)});ta.addEventListener('blur',()=>{DM.notes[c.id]=ta.value;dmSave()});
-  w.append(sec('記','DM-Notizen zu '+(c.name||'Ohne Namen'),ta,h('p',{class:'note'},'Wird in diesem Browser gespeichert und gehört nicht zum Bogen. Beim Export gehen sie nicht an den Spieler.')));
-  const sheetWrap=h('div',{style:'overflow-x:auto;border:1px solid var(--line);border-radius:var(--r)'});const sh=pdfSheet(c);sh.style.width='100%';sh.style.maxWidth='794px';sh.lastChild.remove();sheetWrap.append(sh);
-  w.append(sec('書','Bogen',sheetWrap,h('div',{class:'addrow',style:'margin-top:12px'},
-    h('span',{class:'note'},DM.added[c.id]?'Zuletzt geladen: '+new Date(DM.added[c.id]).toLocaleString('de-DE'):''),
-    h('button',{class:'btn ghost small',type:'button',onclick:()=>exportPdf(c)},'⇩ Als PDF'),
-    h('button',{class:'btn ghost small',type:'button',onclick:()=>dmRemove(c)},'Aus der Sammlung nehmen'))));
-  return w}
-
 /* ---------- live combat per class and race ---------- */
 const CB=c=>{c.cb=c.cb||{};return c.cb};
 const cbUpd=fn=>upd(c=>{R_(c);fn(c,CB(c))});
@@ -643,7 +620,7 @@ function pactTrackers(c){if(c.classId!=='hanyo')return[];const out=[];
     const only=rid==='kitsune'?(n=>/Zwillingstrugbild/.test(n)):null;
     out.push(...raceTrackers(rid,Math.min(cap,c.level),c,'p:'+rid+':',only).map(x=>({...x,n:'Pakt mit '+p.pate})))}
   return out}
-function allTrackers(c){return[...raceTrackers(c.raceId,c.level,c,'r:'),...pactTrackers(c),...subTrackers(c)]}
+function allTrackers(c){return[...raceTrackers(c.raceId,c.level,c,'r:'),...pactTrackers(c),...subTrackers(c),...dmTrackers(c)]}
 function afterShortRest(c){R_(c);for(const x of allTrackers(c))if(x.reset==='short')c.res[x.k]=x.max}
 function afterLongRest(c){R_(c);for(const x of allTrackers(c))c.res[x.k]=x.max;c.cb={}}
 
@@ -667,12 +644,12 @@ function jagdbuchDoc(c,compact){const d=c.dec||{};const rows=d.jagdbuch||[];cons
   w.append(list,row(pbtn('＋ Art eintragen',()=>upd(c=>{R_(c);c.dec.jagdbuch=[...(c.dec.jagdbuch||[]),{art:'',besiegt:0,wissen:''}]}),{id:'jbAdd'})));
   return w}
 function yhCombat(c){const d=c.dec||{},m=mods(c),l=c.level,cb=CB(c);const w=h('div');const maxB=l>=9?2:1;const beute=cb.beute||[];const arts=(d.jagdbuch||[]).map(r=>r.art).filter(Boolean);
-  const at=attacks(c);const known=d.griffe||[];
+  const at=attacks(c);const known=[...(d.griffe||[]),...ce(c,'Griff').map(e=>e.name)];
   beute.forEach((b,bi)=>{const B=jbBonus(c,b.art,true);const troph=cb.troph&&b.art&&cb.troph.toLowerCase()===b.art.toLowerCase()?Math.max(0,m.wis):0;
     const tb=h('table');tb.append(h('tr',{},h('th',{},'Angriff gegen '+(b.label||b.art||'Beute')),h('th',{},'Treffer'),h('th',{},'Schaden')));
     for(const a of at){const hit=a.hit+B.hit+troph;const dm=a.dmg+(B.dice?'+'+B.dice:'');const bonus=a.mod+troph;
       tb.append(h('tr',{},h('td',{},h('b',{},a.n)),h('td',{},sbtn(sgn(hit),()=>rollToast(a.n+' Treffer','1d20',hit))),h('td',{},sbtn(dm+(bonus?' '+sgn(bonus):'')+' '+a.type,()=>rollToast(a.n+' Schaden',dm,bonus)))))}
-    const gl=h('div');for(const g of known){const used=!!(b.used||{})[g];const t=DATA.griffText[g]||'Eigener Griff';const art=(YH_GRIFFE.find(x=>x[1]===g)||['Eigener'])[0];
+    const gl=h('div');for(const g of known){const used=!!(b.used||{})[g];const t=DATA.griffText[g]||ceText(c,g)||'Eigener Griff';const art=(YH_GRIFFE.find(x=>x[1]===g)||[ceArt(c,g)||'Eigener'])[0];
       const dice={'Auf Sicht':'3d8','Ausbluten':'2d6','Rudeljagd':'1d6'}[g];
       gl.append(h('div',{class:'feat',style:used?'opacity:.55':''},h('div',{class:'addrow',style:'align-items:center;flex-wrap:wrap'},h('label',{style:'display:flex;gap:6px;align-items:center'},(()=>{const cbx=h('input',{type:'checkbox',id:'gr-'+bi+'-'+g});cbx.checked=used;cbx.addEventListener('change',()=>cbUpd((c,cb)=>{const x=cb.beute[bi];x.used=x.used||{};x.used[g]=cbx.checked}));return cbx})(),h('b',{},art+': '+g),used?' · verbraucht':''),dice?rbtn(dice,dice,0,g):null),h('p',{class:'note',style:'margin:4px 0 0'},t)))}
     w.append(card('獲 Beute '+(bi+1)+': '+(b.label||b.art||'ohne Art'),
@@ -750,8 +727,8 @@ function samCombat(c){const d=c.dec||{},l=c.level,pb=prof(l),cb=CB(c);const w=h(
     NOTE(st==='Ittō'?'Ruhe gewinnen: Verzichtest du in deinem Zug auf Angriff und Bewegung, +1 Ruhe.':'Ruhe gewinnen: Triffst du in deinem Zug mit beiden Klingen dieselbe Kreatur, +1 Ruhe.'),
     l>=2?(st==='Ittō'?row(pbtn('Iaijutsu: '+ruhe+'d'+wd+' zusätzlich',()=>{if(!ruhe)return toast('Keine Ruhe');rollToast('Iaijutsu',ruhe+'d'+wd,0);set(0)},{disabled:!ruhe})):row(pbtn('Zweiter Himmel (−'+(l>=11?1:2)+' Ruhe)',()=>{const k=l>=11?1:2;if(ruhe<k)return toast('Zu wenig Ruhe');set(ruhe-k);toast('Zweiter Himmel: Verbindung als Bonus Action')}),pbtn('Wakizashi-Parade (−1 Ruhe, +3 AC)',()=>{if(ruhe<1)return toast('Zu wenig Ruhe');set(ruhe-1);toast('Parade: +3 AC gegen diesen Angriff')}))):NOTE('Haltungstechnik ab Stufe 2.')));
   const v=cb.verb||0;const full=l>=20&&d.vollendet&&cb.kata===d.vollendet;const n=full?3:v;
-  const known=d.bewegungen||[];const fin=[['Schnitt','1d10'],['Stich','1d8'],['Fall','1d8']].filter(([k])=>known.includes(k));const extra=(d.schulen||[]);
-  const kb=h('div');for(const k of known){const t=DATA.moveText[k];if(t)kb.append(h('div',{class:'note',style:'margin:2px 0'},h('b',{},k+': '),t))}
+  const known=[...(d.bewegungen||[]),...ce(c,'Bewegung').map(e=>e.name)];const fin=[['Schnitt','1d10'],['Stich','1d8'],['Fall','1d8']].filter(([k])=>known.includes(k));const extra=(d.schulen||[]);
+  const kb=h('div');for(const k of known){const t=DATA.moveText[k]||ceText(c,k);if(t)kb.append(h('div',{class:'note',style:'margin:2px 0'},h('b',{},k+': '),t))}
   const katas=(d.katas||[]).map(k=>k.name).filter(Boolean);
   w.append(card('型 Kata',row(katas.length?h('select',{id:'kataSel','aria-label':'Kata',onchange:e=>cbUpd((c,cb)=>{cb.kata=e.target.value})},h('option',{value:''},'Kata wählen (optional)'),katas.map(k=>h('option',{value:k,selected:cb.kata===k},k))):null,
       sbtn('Auftakt',()=>cbUpd((c,cb)=>{cb.verb=0;cb.auf=true})),sbtn('+1 Verbindung',()=>cbUpd((c,cb)=>{cb.verb=(cb.verb||0)+1})),sbtn('Bruch',()=>cbUpd((c,cb)=>{cb.verb=0;cb.auf=false}))),
@@ -803,7 +780,7 @@ function priestCombat(c){const d=c.dec||{},l=c.level,pb=prof(l),m=mods(c);const 
   const cs=counters(c);const mx=k=>(cs.find(x=>x.k===k)||{}).max||0;
   w.append(card('魂 Seelenritual · '+resVal(c,'rituale',mx('rituale'))+' übrig',NOTE(`Ziel in 60 ft., WIS-Saving Throw gegen DC ${dc}: voller Seelenschaden, bei Erfolg die Hälfte. Ignoriert AC, Hit Points und Resistenzen. Dazu Radiant Damage in doppelter Höhe auf die Hit Points.`),
     row(pbtn('Ritual: '+dice,()=>{if(!use('rituale',mx('rituale')))return;const r=roll(dice);toast(`Seelenschaden ${r.tot} (${r.parts.join(' + ')}) · Radiant ${2*r.tot} · halbiert bei Erfolg`)},{id:'ritBtn'}))));
-  const tl=h('div');for(const t of d.talismane||[]){if(!t.name)continue;tl.append(h('div',{class:'feat'},h('div',{class:'addrow',style:'align-items:center;flex-wrap:wrap'},h('b',{},t.name+(+t.verb?' +'+t.verb:'')),sbtn('Einsetzen',()=>{if(use('bereit',mx('bereit')))toast(t.name+' eingesetzt')})),h('p',{class:'note',style:'margin:4px 0 0'},DATA.talisText[t.name]||'Eigener Talisman.')))}
+  const tl=h('div');for(const t of [...(d.talismane||[]),...ce(c,'Talisman').map(e=>({name:e.name,verb:0}))]){if(!t.name)continue;tl.append(h('div',{class:'feat'},h('div',{class:'addrow',style:'align-items:center;flex-wrap:wrap'},h('b',{},t.name+(+t.verb?' +'+t.verb:'')),sbtn('Einsetzen',()=>{if(use('bereit',mx('bereit')))toast(t.name+' eingesetzt')})),h('p',{class:'note',style:'margin:4px 0 0'},DATA.talisText[t.name]||ceText(c,t.name)||'Eigener Talisman.')))}
   w.append(card('符 Talismane · '+resVal(c,'bereit',mx('bereit'))+' von '+mx('bereit')+' bereit',tl.childNodes.length?tl:NOTE('Noch keine Talismane eingetragen (Reiter „Klasse“).')));
   if(l>=6){const gl=h('div');for(const g of d.geister||[])if(g.name)gl.append(row(h('b',{},g.name),h('span',{class:'note'},g.schrein||''),sbtn('Rufen (Action)',()=>{if(use('geisterruf',mx('geisterruf')))toast(g.name+' erscheint')})));
     w.append(card('霊 Geisterruf · '+resVal(c,'geisterruf',mx('geisterruf'))+' übrig',NOTE('Erscheint in 30 ft., handelt auf deiner Initiative, bleibt '+(l>=18?'1 Stunde':'10 Minuten')+'. CR bis '+(l>=18?9:l>=14?5:1)+(l>=18?', zwei gleichzeitig.':', einer gleichzeitig.')),gl.childNodes.length?gl:NOTE('Noch keine Geisternamen.')))}
@@ -864,9 +841,9 @@ function hanyoTurn(c){upd(c=>{R_(c);const l=c.level,pb=prof(l);const ymax=soulMa
   if(l>=6&&(c.hp??hpMax(c))>0)c.hp=Math.min(hpMax(c),(c.hp??hpMax(c))+(l>=14?2*pb:pb))});toast('Zug: Yōki aufgeladen')}
 
 /* ---------- Biwa hōshi ---------- */
-function biwaCombat(c){const d=c.dec||{},l=c.level,m=mods(c),cb=CB(c);const w=h('div');const known=d.strophen||[];const maxS=l>=10?2:1;const on=cb.strophe||[];const pb=prof(l);
+function biwaCombat(c){const d=c.dec||{},l=c.level,m=mods(c),cb=CB(c);const w=h('div');const known=[...(d.strophen||[]),...ce(c,'Strophe').map(e=>e.name)];const maxS=l>=10?2:1;const on=cb.strophe||[];const pb=prof(l);
   w.append(card('琵 Strophe spielen · Bonus Action, Concentration'+(l>=10?' · zwei gleichzeitig':''),h('div',{class:'pick'},known.map(s=>{const a=on.includes(s);return h('button',{class:'pill',type:'button','aria-pressed':String(a),onclick:()=>cbUpd((c,cb)=>{let x=cb.strophe||[];x=a?x.filter(y=>y!==s):[...x,s];while(x.length>maxS)x.shift();cb.strophe=x})},s)})),
-    ...on.map(s=>h('p',{class:'note',style:'margin:4px 0'},h('b',{},s+': '),DATA.strophenText[s]||'')),NOTE('Solange du spielst, darfst du dich bewegen und rezitieren, aber keine Waffe führen.')));
+    ...on.map(s=>h('p',{class:'note',style:'margin:4px 0'},h('b',{},s+': '),DATA.strophenText[s]||ceText(c,s)||'')),NOTE('Solange du spielst, darfst du dich bewegen und rezitieren, aber keine Waffe führen.')));
   const mul=l>=17?3:l>=9?2:1;const amt=Math.max(0,m.cha*mul);const v=resVal(c,'rezitation',pb);
   const use=()=>{if(v<=0){toast('Keine Rezitation mehr');return false}upd(c=>{R_(c);c.res.rezitation=v-1});return true};
   w.append(card('名 Namensrezitation · '+v+' / '+pb,row(pbtn('Rezitieren: +'+amt+' Soul HP',()=>{if(use())toast('Ein Ziel in '+(l>=6?60:30)+' ft. gewinnt '+amt+' Soul HP')}),l>=5?pbtn('Trostlied: alle +'+Math.ceil(Math.max(0,m.cha)/2),()=>{if(use())toast('Alle Verbündeten in '+(l>=6?60:30)+' ft.: +'+Math.ceil(Math.max(0,m.cha)/2)+' Soul HP')}):null),
@@ -981,7 +958,6 @@ function gradCard(c){const g=hanyoGrad(c),l=c.level,d=c.dec||{};const w=h('div')
   return w}
 
 /* ---------- Unterrassen (vom Spielleiter freigeschaltet) ---------- */
-function subOf(c){const f=(store.forced||{})[c.id];if(f&&f.sub)return f;if(f&&f.sub===null)return null;return c.sub||null}
 function subLabel(s){if(!s||!DATA.sub[s.sub])return'';return DATA.sub[s.sub].name+(s.sub==='gashadokuro'?' · Körperstufe '+['','I','II','III'][s.stufe||1]:'')}
 function subTrackers(c){const s=subOf(c);if(!s)return[];
   if(s.sub==='moonfolk')return DATA.sub.moonfolk.ranks.filter(([r,lv,n])=>lv<=c.level&&!/passiv|keine Änderung/.test(n)).map(([r,lv,n])=>({k:'sub:m'+r,l:n+' · Rang '+r,max:1,reset:'long',n:'Moonfolk · ab Stufe '+lv}));
@@ -1049,29 +1025,123 @@ async function driveFlush(){if(drive.busy){driveSave();return}drive.busy=true;le
   for(const c of S.chars.filter(c=>c.id===activeId())){const s=JSON.stringify(c);if(drive.synced[c.id]===s)continue;
     try{const r=await driveCall({action:'save',id:c.id,key:charKey(c.id),char:c});
       if(r.ok){drive.synced[c.id]=s;const before=JSON.stringify(store.forced[c.id]||null);if(r.forced)store.forced[c.id]=r.forced;else delete store.forced[c.id];if(before!==JSON.stringify(store.forced[c.id]||null))changed=true}else err=r.error}catch(e){err='offline'}}
-  drive.busy=false;drive.err=err;const ac=S.chars.find(c=>c.id===activeId());setStatus(err?driveErr(err):ac?'<b>Gespeichert</b> · „'+(ac.name||'Ohne Namen')+'“ ist beim Spielleiter in Google Drive':'Noch kein Charakter für den Spielleiter.');if(changed)render();if(err==='offline'){clearTimeout(drive.timer);drive.timer=setTimeout(driveFlush,30000)}}
+  drive.busy=false;drive.err=err;deliverDm();const ac=S.chars.find(c=>c.id===activeId());setStatus(err?driveErr(err):ac?'<b>Gespeichert</b> · „'+(ac.name||'Ohne Namen')+'“ ist beim Spielleiter in Google Drive':'Noch kein Charakter für den Spielleiter.');if(changed)render();if(err==='offline'){clearTimeout(drive.timer);drive.timer=setTimeout(driveFlush,30000)}}
 async function drivePoll(){if(document.hidden||!S.chars.length)return;let changed=false;store.forced=store.forced||{};
   for(const c of S.chars.filter(c=>c.id===activeId())){try{const r=await driveCall({action:'get',id:c.id,key:charKey(c.id)});const before=JSON.stringify(store.forced[c.id]||null);
       if(r.forced)store.forced[c.id]=r.forced;else if(r.ok||r.error==='not_found')delete store.forced[c.id];if(before!==JSON.stringify(store.forced[c.id]||null))changed=true}catch(e){}}
-  if(changed){render();toast('Der Spielleiter hat etwas an deinem Charakter freigeschaltet')}}
+  deliverDm();if(changed){render();toast('Der Spielleiter hat etwas an deinem Charakter freigeschaltet')}}
 function driveInit(){store.mode='drive';setStatus('Verbindet mit Google Drive …');drive.synced={};const a=activeId();for(const c of S.chars)if(c.id!==a)driveRemove(c.id);render();driveFlush();drivePoll();drive.poll=setInterval(drivePoll,120000)}
 function driveRemove(id){if(store.mode!=='drive')return;driveCall({action:'remove',id,key:charKey(id)}).catch(()=>{})}
 async function driveForce(id,v){try{const r=await driveCall({action:'force',dm:drive.dmpw,id,value:v});if(!r.ok)throw r;store.forced=r.forced||{};await driveList();toast(v?'Erzwungen: '+subLabel(v):'Unterrasse zurückgenommen')}catch(e){toast('Erzwingen ging nicht ('+(e&&e.error||'offline')+')')}}
 async function driveList(){const r=await driveCall({action:'list',dm:drive.dmpw});if(!r.ok)throw r;drive.list=r.chars||[];store.forced={...(store.forced||{}),...(r.forced||{})};if(S.party)render();return r}
+/* ---------- Startausrüstung (Klassen-Dokumente, Abschnitt „Startausrüstung“) ---------- */
+const GEAR={
+  samurai:{note:'Waffen nach deiner Haltung, Rüstung nach deiner Armor-Wahl.',fixed:D=>[...(D.haltung==='Nitō'?['Katana','Wakizashi']:['Katana','Tantō']),...(D.armor==='Medium'?['Dō-maru']:D.armor==='Light'?['Hara-ate']:[]),'Schulbuch (leer)','Reisegewand des Clans']},
+  yokaihunter:{note:'Waffen nach deinem Waffenfokus.',fixed:D=>[...(D.fokus==='Klinge'?['Katana','Wakizashi']:D.fokus==='Bogen'?['Hankyū','Pfeile (20)','Tantō']:[]),'Hara-ate','Jagdbuch (leer)','Zutaten für Gegenmittel','Fallenausrüstung']},
+  sohei:{fixed:()=>['Naginata','Ō-yoroi','Tate']},
+  schreinpriester:{note:'Rüstung nach deiner Armor-Wahl.',choose:[{k:'waffe',l:'Waffe',opts:[['Azusa-yumi',['Azusa-yumi']],['Bō und Tantō (Nahkampf)',['Bō','Tantō']]]}],fixed:D=>[...(D.armor==='Light'?['Hara-ate']:[]),'Talisman-Werkzeug','Priestergewand']},
+  kamikagari:{choose:[{k:'waffe',l:'Waffe',opts:[['Yari',['Yari']],['Katana',['Katana']]]}],fixed:()=>['Tantō','Dō-maru','Tate','Geschnitzter Talisman']},
+  onmyoji:{fixed:()=>['Bō','Ofuda und Tusche','Divinationswerkzeug']},
+  hanyo:{note:'Rüstung nach deiner Armor-Wahl, sofern sie die Klauen nicht behindert.',choose:[{k:'tanto',l:'Waffe (optional)',opts:[['Tantō',['Tantō']],['Keine, nur Klauen und Biss',[]]]}],fixed:D=>[...(D.armor==='Light'?['Hara-ate']:[]),'Unauffällige Alltagskleidung']},
+  biwahoshi:{fixed:()=>['Bō','Biwa','Epos (leer)']},
+  ninja:{choose:[{k:'waffe',l:'Startwaffe (Versatile)',opts:[['Katana',['Katana']],['Bō',['Bō']]]},{k:'spezial',l:'Spezialitem',opts:[['Disguise Kit',['Disguise Kit']],["Thieves' Tools",["Thieves' Tools"]],['Gaming Set',['Gaming Set']]]}],fixed:()=>['Hara-ate']}};
+function gearList(st){const g=GEAR[st.classId];if(!g)return[];const D=st.dec,G=st.gearPick||{};const out=[];
+  for(const ch of g.choose||[]){const o=ch.opts.find(x=>x[0]===G[ch.k]);if(o)out.push(...o[1])}
+  out.push(...g.fixed(D));return out.filter(n=>ITEM[n])}
+function gearStep(d,st,draw){const g=GEAR[st.classId];if(!g)return;st.gearPick=st.gearPick||{};const box=h('div',{style:'margin:4px 0 22px'});
+  box.append(h('h3',{style:'font-size:18px;margin-bottom:4px'},'Startausrüstung'),g.note?h('p',{class:'note'},g.note):'');
+  for(const ch of g.choose||[])box.append(h('div',{class:'label',style:'margin:10px 0 6px'},ch.l),h('div',{class:'pick'},ch.opts.map(([l])=>h('button',{class:'pill',type:'button','aria-pressed':String(st.gearPick[ch.k]===l),onclick:()=>{st.gearPick[ch.k]=st.gearPick[ch.k]===l?null:l;draw()}},l))));
+  const list=gearList(st);box.append(h('p',{class:'note',style:'margin-top:10px'},h('b',{},'Du bekommst: '),list.length?list.join(', '):'—'));d.append(box)}
+function gearValid(st){const g=GEAR[st.classId];if(!g)return true;return(g.choose||[]).every(ch=>(st.gearPick||{})[ch.k])}
+function gearApply(c,st){for(const n of gearList(st)){addItem(c,ITEM[n]);const it=c.inv.find(i=>i.n===n);const cat=ITEM[n].cat;if(cat==='Waffe'||(it.armor&&it.armor.type!=='clothes'))it.equipped=true}}
+/* ---------- Spielleiter-Zusätze: Items, Klassenelemente, Rassen ---------- */
+function ovOf(c){const r=(store.forced||{})[c.id];return r||c.dmo||{}}
+function subOf(c){const r=(store.forced||{})[c.id];if(r&&'sub'in r)return r.sub?r:null;if(c.dmo&&'sub'in c.dmo)return c.dmo.sub?c.dmo:null;return c.sub||null}
+const EL_TYPES={samurai:['Bewegung','Kata','Schule'],yokaihunter:['Griff','Gegenmittel'],sohei:['Bürde-Nutzung'],schreinpriester:['Talisman','Ritual'],kamikagari:['Göttliche Gabe'],onmyoji:['Formel','Shikigami'],hanyo:['Pakt-Fähigkeit'],biwahoshi:['Strophe'],ninja:['Technik']};
+const EL_ART={Bewegung:['Auftakt','Verbindung','Abschluss'],Griff:['Anschlag','Hetze','Riss']};
+function ce(c,typ){return(ovOf(c).elements||[]).filter(e=>!typ||e.typ===typ)}
+function ceText(c,name){const e=(ovOf(c).elements||[]).find(x=>x.name===name);return e?e.text:''}
+function ceArt(c,name){const e=(ovOf(c).elements||[]).find(x=>x.name===name);return e?e.art:''}
+function dmTrackers(c){const o=ovOf(c);const out=[];
+  for(const e of o.elements||[])if(+e.uses>0)out.push({k:'ce:'+e.id,l:e.name,max:+e.uses,reset:e.reset||'long',n:'Vom Spielleiter · '+e.typ});
+  for(const r of o.races||[])for(const t of r.traits||[])if(+t.uses>0&&(+t.lv||1)<=c.level)out.push({k:'cr:'+r.id+':'+t.id,l:t.name+' · '+r.name,max:+t.uses,reset:t.reset||'long',n:'Vom Spielleiter · ab Stufe '+(+t.lv||1)});
+  return out}
+function deliverDm(){const got=[];for(const c of S.chars){const o=ovOf(c);for(const it of o.items||[]){c.dmGot=c.dmGot||[];if(c.dmGot.includes(it.id))continue;c.dmGot.push(it.id);
+      const x={id:uid(),n:it.n,d:(it.d?it.d+' · ':'')+'vom Spielleiter',q:+it.q||1,w:+it.w||0,dm:true};if(it.armor)x.armor={...it.armor};if(!ITEM[it.n])x.custom=true;c.inv.push(x);got.push((c.name||'Charakter')+': '+it.n)}}
+  if(got.length){save();render();toast('Vom Spielleiter erhalten · '+got.join(', '))}}
+function dmView(c){const o=ovOf(c);const els=o.elements||[],races=o.races||[];if(!els.length&&!races.length)return null;const w=h('div');
+  for(const r of races){const tl=h('div');for(const t of (r.traits||[]).slice().sort((a,b)=>(+a.lv||1)-(+b.lv||1))){const on=(+t.lv||1)<=c.level;
+      tl.append(h('div',{class:'feat',style:on?'':'opacity:.5'},h('div',{class:'addrow',style:'align-items:center;flex-wrap:wrap'},h('span',{class:'lv'},'Stufe '+(+t.lv||1)),h('b',{},t.name),+t.uses?h('span',{class:'chip'},t.uses+'× pro '+(t.reset==='short'?'Short':'Long')+' Rest'):null),on?h('p',{class:'note',style:'margin:4px 0 0;white-space:pre-wrap'},t.text||''):null))}
+    w.append(card('種 '+r.name,r.text?h('p',{class:'note',style:'white-space:pre-wrap'},r.text):null,tl))}
+  if(els.length){const el=h('div');for(const e of els)el.append(h('div',{class:'feat'},h('div',{class:'addrow',style:'align-items:center;flex-wrap:wrap'},h('span',{class:'chip shu'},e.typ),e.art?h('span',{class:'chip'},e.art):null,h('b',{},e.name),+e.uses?h('span',{class:'chip'},e.uses+'× pro '+(e.reset==='short'?'Short':'Long')+' Rest'):null),h('p',{class:'note',style:'margin:4px 0 0;white-space:pre-wrap'},e.text||'')));
+    w.append(card('研 Erforschte Elemente',el))}
+  return w}
+async function saveOverlay(c,o,src){try{
+    if(src==='drive'){const r=await driveCall({action:'force',dm:drive.dmpw,id:c.id,value:o});if(!r.ok)throw r;store.forced=r.forced||{};await driveList()}
+    else if(src==='db'){store.forced={...(store.forced||{}),[c.id]:o};await store.db.doc('forced/all').set({chars:store.forced,updated:Date.now()})}
+    else{const x=DM.chars.find(y=>y.id===c.id);if(x){x.dmo=o;dmSave()}}
+    render();toast('Gespeichert'+(src==='local'?'. Exportiere die Datei für den Spieler.':'. Der Spieler bekommt es beim nächsten Abgleich.'))}catch(e){toast('Speichern ging nicht ('+(e&&e.error||e&&e.code||'offline')+')')}}
+function dmTools(c,src){const o=JSON.parse(JSON.stringify(ovOf(c)));const set=fn=>{fn(o);saveOverlay(c,o,src)};const w=h('div');
+  const fc=forceControls(c,subOf(c),v=>set(o=>{if(v){o.sub=v.sub;if(v.stufe)o.stufe=v.stufe;else delete o.stufe}else{o.sub=null;delete o.stufe}}));if(fc)w.append(card('進 Unterrasse',fc));
+  const isel=h('select',{id:'giveItem','aria-label':'Item aus dem Katalog'},h('option',{value:''},'Aus dem Katalog …'),DATA.items.map(i=>h('option',{value:i.n},i.n+' ('+i.cat+')')));
+  const iname=h('input',{id:'giveName',placeholder:'oder eigenes Item: Name'}),idesc=h('input',{id:'giveDesc',placeholder:'Beschreibung / Wirkung',style:'flex:1;min-width:200px'}),iw=nIn('giveW',0,0,999,64),iq=nIn('giveQ',1,1,99,56);
+  const il=h('div');(o.items||[]).forEach((it,i)=>il.append(row(h('b',{},(it.q>1?it.q+'× ':'')+it.n),h('span',{class:'note'},it.d||''),sbtn('✕',()=>set(o=>{o.items.splice(i,1)}),{'aria-label':'Aus der Liste nehmen'}))));
+  w.append(card('贈 Besonderes Item geben',row(isel),row(iname,idesc),row(h('label',{class:'note',for:'giveW'},'Gewicht lb.'),iw,h('label',{class:'note',for:'giveQ'},'Anzahl'),iq,
+      pbtn('Geben',()=>{const cat=ITEM[isel.value];const n=cat?cat.n:iname.value.trim();if(!n)return toast('Wähle ein Item oder gib einen Namen ein');const it={id:uid(),n,d:idesc.value.trim()||(cat?cat.d:''),w:cat?cat.w:+iw.value||0,q:Math.max(1,+iq.value||1)};if(cat&&cat.armor)it.armor={...cat.armor};set(o=>{o.items=[...(o.items||[]),it]})},{id:'giveBtn'})),
+    il.childNodes.length?h('div',{style:'margin-top:8px'},h('div',{class:'label'},'Bisher gegeben'),il):null,NOTE('Das Item landet beim nächsten Abgleich im Inventar des Spielers, markiert als „vom Spielleiter“. Danach verwaltet er es selbst; aus dieser Liste nehmen holt es nicht zurück.')));
+  const types=[...(EL_TYPES[c.classId]||[]),'Fähigkeit'];const tsel=h('select',{id:'elTyp','aria-label':'Typ'},types.map(t=>h('option',{value:t},t)));
+  const asel=h('input',{id:'elArt',placeholder:'Art (z. B. Auftakt, Ka, Tier 2)',list:'elArtList'});const al=h('datalist',{id:'elArtList'},[...new Set([...Object.values(EL_ART).flat(),...ELEM])].map(x=>h('option',{value:x})));
+  const en=h('input',{id:'elName',placeholder:'Name'}),et=h('textarea',{id:'elText',rows:'3',placeholder:'Was es tut',style:'width:100%;padding:8px;border:1px solid var(--line);border-radius:3px;background:var(--paper);color:var(--sumi);font:inherit'}),eu=nIn('elUses',0,0,20,56),er=h('select',{id:'elReset','aria-label':'Rast'},h('option',{value:'long'},'Long Rest'),h('option',{value:'short'},'Short Rest'));
+  const ell=h('div');(o.elements||[]).forEach((e,i)=>ell.append(h('div',{class:'feat'},h('div',{class:'addrow',style:'align-items:center;flex-wrap:wrap'},h('span',{class:'chip shu'},e.typ),e.art?h('span',{class:'chip'},e.art):null,h('b',{},e.name),sbtn('✕',()=>set(o=>{o.elements.splice(i,1)}),{'aria-label':'Element entfernen'})),h('p',{class:'note',style:'margin:4px 0 0'},e.text||''))));
+  w.append(card('研 Erforschtes Klassenelement hinzufügen',row(tsel,asel,al),row(en),et,row(h('label',{class:'note',for:'elUses'},'Nutzungen (0 = unbegrenzt)'),eu,h('span',{class:'note'},'pro'),er,
+      pbtn('Hinzufügen',()=>{if(!en.value.trim())return toast('Name fehlt');const e={id:uid(),typ:tsel.value,art:asel.value.trim(),name:en.value.trim(),text:et.value.trim(),uses:+eu.value||0,reset:er.value};set(o=>{o.elements=[...(o.elements||[]),e]})},{id:'elBtn'})),
+    ell.childNodes.length?h('div',{style:'margin-top:8px'},ell):null,NOTE('Bewegungen, Griffe, Talismane und Strophen erscheinen beim Spieler direkt in seiner Klasse und im Kampf, alles andere als „Erforschte Elemente“ auf Bogen und Kampfseite.')));
+  const rn=h('input',{id:'raceName',placeholder:'Name, z. B. Chimera'}),rt=h('textarea',{id:'raceText',rows:'2',placeholder:'Beschreibung (optional)',style:'width:100%;padding:8px;border:1px solid var(--line);border-radius:3px;background:var(--paper);color:var(--sumi);font:inherit'});
+  const rl=h('div');(o.races||[]).forEach((r,i)=>{const tl=h('div');(r.traits||[]).forEach((t,j)=>tl.append(row(h('span',{class:'lv'},'St. '+(+t.lv||1)),h('b',{},t.name),+t.uses?h('span',{class:'chip'},t.uses+'×/'+(t.reset==='short'?'SR':'LR')):null,h('span',{class:'note',style:'flex:1;min-width:120px'},t.text||''),sbtn('✕',()=>set(o=>{o.races[i].traits.splice(j,1)}),{'aria-label':'Merkmal entfernen'}))));
+    const tlv=nIn('tLv-'+i,1,1,20,56),tn=h('input',{id:'tName-'+i,placeholder:'Merkmal'}),tx=h('input',{id:'tText-'+i,placeholder:'Wirkung',style:'flex:1;min-width:180px'}),tu=nIn('tUses-'+i,0,0,20,56),tr=h('select',{id:'tReset-'+i,'aria-label':'Rast'},h('option',{value:'long'},'LR'),h('option',{value:'short'},'SR'));
+    rl.append(h('div',{class:'feat'},h('div',{class:'addrow',style:'align-items:center'},h('b',{},r.name),sbtn('Rasse entfernen',()=>set(o=>{o.races.splice(i,1)}))),r.text?h('p',{class:'note'},r.text):null,tl,
+      row(h('label',{class:'note',for:'tLv-'+i},'ab Stufe'),tlv,tn,tx,h('label',{class:'note',for:'tUses-'+i},'Nutzungen'),tu,tr,pbtn('＋ Merkmal',()=>{if(!tn.value.trim())return toast('Name fehlt');const t={id:uid(),lv:Math.max(1,+tlv.value||1),name:tn.value.trim(),text:tx.value.trim(),uses:+tu.value||0,reset:tr.value};set(o=>{o.races[i].traits=[...(o.races[i].traits||[]),t]})},{id:'tBtn-'+i}))))});
+  w.append(card('種 Neue Rasse hinzufügen',NOTE('Kommt zur bestehenden Rasse dazu. Ihre Merkmale erscheinen beim Spieler ab der eingetragenen Stufe auf Bogen und Kampfseite, Nutzungen mit Zähler.'),row(rn),rt,row(pbtn('Rasse anlegen',()=>{if(!rn.value.trim())return toast('Name fehlt');set(o=>{o.races=[...(o.races||[]),{id:uid(),name:rn.value.trim(),text:rt.value.trim(),traits:[]}]})},{id:'raceBtn'})),rl.childNodes.length?h('div',{style:'margin-top:8px'},rl):null));
+  return w}
+function dmSources(){const out=[];
+  if(store.mode==='drive'&&drive.dmpw&&drive.list)for(const x of drive.list){const c=x.char;if(c&&C[c.classId]&&R[c.raceId]){c.id=c.id||x.id;out.push({c,src:'drive',when:x.updated})}}
+  if(store.mode==='db'&&store.owner)for(const[uid0,cs]of Object.entries(store.others||{}))for(const c of cs||[])if(C[c.classId]&&R[c.raceId])out.push({c,src:'db'});
+  for(const c of DM.chars)if(C[c.classId]&&R[c.raceId]&&!out.find(x=>x.c.id===c.id))out.push({c,src:'local',when:DM.added[c.id]});return out}
+function viewDm(){const w=h('div');
+  w.append(h('div',{class:'label'},'観 · Sammlung des Spielleiters'),h('h1',{style:'font-size:32px;margin:6px 0 6px'},'Sammlung (DM)'));
+  if(store.mode==='drive'&&!drive.dmpw){const box=h('div',{class:'party'});drivePartyLogin(box);w.append(box);return w}
+  if(store.mode==='db'&&!store.owner){w.append(NOTE('Die Sammlung ist nur für den Spielleiter.'));return w}
+  if(store.mode==='drive'&&!drive.list){w.append(NOTE('Lädt die Charaktere aus Drive …'));driveList().then(()=>render()).catch(()=>{});return w}
+  w.append(h('p',{class:'note',style:'margin-bottom:10px'},store.mode==='drive'?'Alle aktiven Charaktere aus deinem Google Drive, dazu Bögen, die du als Datei geladen hast. Deine Notizen bleiben in diesem Browser.':store.mode==='db'?'Alle Charaktere der Gruppe, dazu Bögen, die du als Datei geladen hast.':'Lade hier die Dateien oder PDFs deiner Spieler. Was du hier vergibst, bekommt der Spieler über die exportierte Datei.'),
+    h('div',{class:'addrow',style:'margin-bottom:18px;flex-wrap:wrap'},h('button',{class:'btn',type:'button',id:'dmAddBtn',onclick:dmAdd},'＋ Bögen hinzufügen'),store.mode==='drive'?h('button',{class:'btn ghost',type:'button',onclick:()=>{drive.list=null;render()}},'⟳ Aus Drive aktualisieren'):null,store.mode==='drive'?h('button',{class:'btn ghost',type:'button',onclick:()=>{drive.dmpw='';drive.list=null;lsSet(DMPW_LS,null);render()}},'Abmelden'):null));
+  const all=dmSources();if(!all.length){w.append(NOTE('Noch keine Charaktere.'));return w}
+  if(!all.find(x=>x.c.id===S.dmSel))S.dmSel=all[0].c.id;
+  const list=h('div',{class:'party',style:'margin-bottom:22px'});
+  for(const{c,src}of all){const cl=C[c.classId],r=R[c.raceId];const on=c.id===S.dmSel;const note=(DM.notes[c.id]||'').trim();
+    list.append(h('button',{class:'pc',type:'button',style:'text-align:left;cursor:pointer;font:inherit;color:inherit'+(on?';outline:2px solid var(--shu)':''),'aria-pressed':String(on),onclick:()=>{S.dmSel=c.id;render()}},
+      h('span',{class:'hanko'+(cl.kanji.length>1?' v':'')},cl.kanji.slice(0,2)),h('div',{},h('b',{},c.name||'Ohne Namen'),h('div',{},`${r.name} · ${cl.name} · Stufe ${c.level}`),
+        h('div',{class:'who'},(src==='drive'?'Drive':src==='db'?'Gruppe':'Datei')+(subOf(c)?' · 進 '+subLabel(subOf(c)):'')),h('div',{class:'who'},note?'✎ '+note.slice(0,40)+(note.length>40?' …':''):'Noch keine Notiz'))))}
+  w.append(list);
+  const sel=all.find(x=>x.c.id===S.dmSel);const c=sel.c;
+  const ta=h('textarea',{id:'dmNote',rows:'5',style:'width:100%;padding:10px;border:1px solid var(--line);border-radius:3px;background:var(--paper);color:var(--sumi);font:inherit','aria-label':'DM-Notizen zu '+(c.name||'diesem Charakter'),placeholder:'Was du dir zu diesem Charakter merken willst: Geheimnisse, Haken, offene Fäden …'});ta.value=DM.notes[c.id]||'';
+  let t;ta.addEventListener('input',()=>{DM.notes[c.id]=ta.value;clearTimeout(t);t=setTimeout(dmSave,300)});ta.addEventListener('blur',()=>{DM.notes[c.id]=ta.value;dmSave()});
+  w.append(sec('記','DM-Notizen zu '+(c.name||'Ohne Namen'),ta,NOTE('Nur in diesem Browser, nie beim Spieler.')));
+  w.append(sec('師','Spielleiter-Werkzeuge für '+(c.name||'Ohne Namen'),dmTools(c,sel.src),sel.src==='local'?h('div',{class:'addrow',style:'margin-top:8px'},h('button',{class:'btn ghost small',type:'button',onclick:()=>exportJson({...c,dmo:ovOf(c)})},'⇩ Datei für den Spieler exportieren')):null));
+  const sheetWrap=h('div',{style:'overflow-x:auto;border:1px solid var(--line);border-radius:var(--r)'});const sh=pdfSheet(c);sh.style.width='100%';sh.style.maxWidth='794px';sh.lastChild.remove();sheetWrap.append(sh);
+  w.append(sec('書','Bogen',sheetWrap,h('div',{class:'addrow',style:'margin-top:12px'},h('button',{class:'btn ghost small',type:'button',onclick:()=>exportPdf(c)},'⇩ Als PDF'),sel.src==='local'?h('button',{class:'btn ghost small',type:'button',onclick:()=>dmRemove(c)},'Aus der Sammlung nehmen'):null)));
+  return w}
+function drivePartyLogin(box){const pw=h('input',{type:'password',id:'dmPw',placeholder:'DM-Passwort','aria-label':'DM-Passwort',autocomplete:'current-password'});const msg=h('p',{class:'note'});
+  const go=async()=>{msg.textContent='Prüft …';try{const r=await driveCall({action:'ping',dm:pw.value});if(r.ok&&r.dm){drive.dmpw=pw.value;lsSet(DMPW_LS,pw.value);msg.textContent='';await driveList();render()}else msg.textContent='Falsches Passwort.'}catch(e){msg.textContent='Drive nicht erreichbar.'}};
+  pw.addEventListener('keydown',e=>{if(e.key==='Enter')go()});
+  box.append(h('div',{class:'vital',style:'grid-column:1/-1;max-width:420px'},h('div',{class:'label'},'Nur für den Spielleiter'),h('p',{class:'note'},'Das Passwort prüft dein Skript bei Google, es steht nicht in dieser Seite.'),h('div',{class:'addrow'},pw,h('button',{class:'btn',type:'button',id:'dmPwBtn',onclick:go},'Anmelden')),msg))}
 function drivePartyFill(box){box.textContent='';
-  if(!drive.dmpw){const pw=h('input',{type:'password',id:'dmPw',placeholder:'DM-Passwort','aria-label':'DM-Passwort',autocomplete:'current-password'});const msg=h('p',{class:'note'});
-    const go=async()=>{msg.textContent='Prüft …';try{const r=await driveCall({action:'ping',dm:pw.value});if(r.ok&&r.dm){drive.dmpw=pw.value;lsSet(DMPW_LS,pw.value);msg.textContent='';await driveList();render()}else msg.textContent='Falsches Passwort.'}catch(e){msg.textContent='Drive nicht erreichbar.'}};
-    pw.addEventListener('keydown',e=>{if(e.key==='Enter')go()});
-    box.append(h('div',{class:'vital',style:'grid-column:1/-1;max-width:420px'},h('div',{class:'label'},'Nur für den Spielleiter'),h('p',{class:'note'},'Die Gruppenansicht zeigt alle Charaktere aus deinem Google Drive. Das Passwort prüft dein Skript bei Google, es steht nicht in dieser Seite.'),h('div',{class:'addrow'},pw,h('button',{class:'btn',type:'button',id:'dmPwBtn',onclick:go},'Anmelden')),msg));return}
-  if(!drive.list){box.append(h('p',{class:'note'},'Lädt die Charaktere aus Drive …'));driveList().catch(e=>{if(e&&e.error==='forbidden'){drive.dmpw='';lsSet(DMPW_LS,null)}box.textContent='';box.append(h('p',{class:'note'},e&&e.error==='forbidden'?'Das Passwort stimmt nicht mehr. Bitte neu anmelden.':'Drive nicht erreichbar.'))});return}
-  if(!drive.list.length)box.append(h('p',{class:'note'},'Noch hat niemand einen Charakter angelegt.'));
-  for(const x of drive.list){const c=x.char;if(!c||!C[c.classId]||!R[c.raceId])continue;c.id=c.id||x.id;const cl=C[c.classId];
-    box.append(h('div',{class:'pc'},h('span',{class:'hanko'+(cl.kanji.length>1?' v':'')},cl.kanji.slice(0,2)),h('div',{},h('b',{},c.name||'Ohne Namen'),h('div',{},`${R[c.raceId].name} · ${cl.name} · Stufe ${c.level}`),
-      h('div',{class:'who'},'Zuletzt gespeichert: '+(x.updated?new Date(x.updated).toLocaleString('de-DE'):'—')),subOf(c)?h('div',{class:'who',style:'color:var(--shu)'},'進 '+subLabel(subOf(c))):null,
-      h('div',{class:'addrow',style:'margin-top:6px'},h('button',{class:'btn ghost small',type:'button',onclick:()=>modal(d=>{const sh=pdfSheet(c);sh.style.width='100%';sh.lastChild.remove();d.append(sh,h('div',{class:'foot'},h('button',{class:'btn ghost',type:'button',onclick:()=>{DM.chars=DM.chars.filter(y=>y.id!==c.id);DM.chars.push(JSON.parse(JSON.stringify(c)));DM.added[c.id]=Date.now();dmSave();closeModal();toast('In deine Sammlung übernommen')}},'In Sammlung übernehmen (mit Notizen)'),h('button',{class:'btn',type:'button',onclick:closeModal},'Schließen')))})},'Bogen ansehen')),
-      forceControls(c,subOf(c),v=>driveForce(c.id,v)))))}
-  box.append(h('div',{style:'grid-column:1/-1',class:'addrow'},h('button',{class:'btn ghost small',type:'button',onclick:()=>{drive.list=null;render()}},'⟳ Aktualisieren'),h('button',{class:'btn ghost small',type:'button',onclick:()=>{drive.dmpw='';drive.list=null;lsSet(DMPW_LS,null);render()}},'Abmelden')));
-  clearInterval(drive.partyPoll);drive.partyPoll=setInterval(()=>{if(S.party&&drive.dmpw&&!document.hidden)driveList().catch(()=>{});else clearInterval(drive.partyPoll)},60000)}
+  if(!drive.roster){box.append(h('p',{class:'note'},'Lädt die Gruppe aus Drive …'));driveCall({action:'roster'}).then(r=>{if(!r.ok)throw r;drive.roster=r.chars||[];store.forced={...(store.forced||{}),...(r.forced||{})};if(S.party)render()}).catch(e=>{box.textContent='';box.append(h('p',{class:'note'},e&&e.error==='unknown_action'?'Die Gruppenansicht braucht die neue Version deines Google-Skripts.':'Drive nicht erreichbar.'))});return}
+  if(!drive.roster.length)box.append(h('p',{class:'note'},'Noch hat niemand einen Charakter angelegt.'));
+  for(const x of drive.roster){const c=x.char;if(!c||!C[c.classId]||!R[c.raceId])continue;c.id=c.id||x.id;const cl=C[c.classId];const mine=S.chars.some(y=>y.id===c.id);
+    box.append(h('div',{class:'pc'},h('span',{class:'hanko'+(cl.kanji.length>1?' v':'')},cl.kanji.slice(0,2)),h('div',{},h('b',{},(c.name||'Ohne Namen')+(mine?' (du)':'')),h('div',{},`${R[c.raceId].name} · ${cl.name} · Stufe ${c.level}`),
+      subOf(c)?h('div',{class:'who',style:'color:var(--shu)'},'進 '+subLabel(subOf(c))):null,
+      h('div',{class:'addrow',style:'margin-top:6px'},h('button',{class:'btn ghost small',type:'button',onclick:()=>modal(d=>{const sh=pdfSheet(c);sh.style.width='100%';sh.lastChild.remove();d.append(sh,h('div',{class:'foot'},h('span'),h('button',{class:'btn',type:'button',onclick:closeModal},'Schließen')))})},'Bogen ansehen')))))}
+  box.append(h('div',{style:'grid-column:1/-1',class:'addrow'},h('button',{class:'btn ghost small',type:'button',onclick:()=>{drive.roster=null;render()}},'⟳ Aktualisieren')))}
 
 function abSel(k,st,draw,c){const s=h('select',{id:'asi-'+k,'aria-label':'Attribut'},h('option',{value:''},'Attribut wählen'),AB.map(a=>{const lim=score(c,a)+(st.asiMode==='one'?2:1)>20;return h('option',{value:a,disabled:lim,selected:st[k]===a},ABN[a]+' ('+score(c,a)+')')}));s.addEventListener('change',()=>{st[k]=s.value;draw()});return s}
 
@@ -1115,7 +1185,7 @@ function viewInv(c){const cl=C[c.classId];const w=h('div');c.inv=c.inv||[];
   return w}
 function addCommon(c){upd(c=>{const clan=c.clan==='Kume'?'Kleidung des Kume-Clans':'Kleidung des Ōtomo-Clans';
   for(const[n,q]of[['Rucksack',1],['Schlafrolle',1],['Wasserschlauch',1],['Seil (50 ft.)',1],['Zunderkasten',1],['Rationen (1 Tag)',5]])addItem(c,ITEM[n],q);
-  if(!c.inv.find(i=>i.n===clan)){addItem(c,ITEM[clan]);c.inv.find(i=>i.n===clan).equipped=true}
+  if(!c.inv.find(i=>i.n===clan)){addItem(c,ITEM[clan]);if(!c.inv.some(i=>i.equipped&&i.armor&&['light','medium','heavy'].includes(i.armor.type)))c.inv.find(i=>i.n===clan).equipped=true}
   c.gold=(c.gold||0)+10});toast('Gemeinsame Ausrüstung und 10 Gold hinzugefügt')}
 
 /* ---------- class modules, combat, rests ---------- */
@@ -1205,6 +1275,7 @@ function viewCombat(c){R_(c);const m=mods(c),pb=prof(c.level),cl=C[c.classId];co
   const cs=counters(c);if(cs.length)w.append(sec('源','Ressourcen',counterGrid(c,cs)));
   const cc=classCombat(c);if(cc)w.append(sec(cl.kanji.slice(0,1),cl.name+' im Kampf',cc));
   const sv=subView(c);if(sv)w.append(sec('進',subLabel(subOf(c)),sv));
+  {const dv=dmView(c);if(dv)w.append(sec('師','Vom Spielleiter',dv))}
   const rt=allTrackers(c);if(rt.length)w.append(sec('種',R[c.raceId].name+(c.classId==='hanyo'&&pactTrackers(c).length?' und Pakte':'')+' · Nutzungen',counterGrid(c,rt),h('p',{class:'note'},'Aus deinen Rassen-Dokumenten gelesen: alle Fähigkeiten mit „pro Short Rest“ oder „pro Long Rest“ bis zu deiner Stufe.')));
   w.append(sec('終','Kampf beenden',h('div',{class:'addrow'},h('button',{class:'btn ghost',type:'button',id:'endFight',onclick:()=>{upd(c=>{const b=(c.cb||{}).beute||[];c.cb={beute:b.map(x=>({...x,neg:false}))};if(c.classId==='onmyoji'&&c.dec){c.dec.zeiger='Kū';c.dec.fluss=0}});toast('Kampf beendet: Kata, Trophäe, Male, Strophen und Widerhall zurückgesetzt')}},'Kampf beenden')),h('p',{class:'note'},'Setzt alles zurück, was nur für einen Kampf gilt. Eine markierte Beute bleibt, bis sie stirbt oder du sie aufgibst.')));
   return w}
@@ -1387,7 +1458,7 @@ async function viewPartyFill(box){if(store.mode==='drive')return drivePartyFill(
   box.textContent='';let n=0;
   for(const id of ids)for(const c of store.others[id]){if(!C[c.classId]||!R[c.raceId])continue;n++;const cl=C[c.classId];
     box.append(h('div',{class:'pc'},h('span',{class:'hanko'+(cl.kanji.length>1?' v':'')},cl.kanji.slice(0,2)),h('div',{},h('b',{},c.name||'Ohne Namen'),h('div',{},`${R[c.raceId].name} · ${cl.name} · Stufe ${c.level}`),
-      h('div',{class:'who'},'Spieler: '+((ps[id]&&ps[id].name)||(id===store.uid?'du':'jemand aus der Gruppe'))),subOf(c)?h('div',{class:'who',style:'color:var(--shu)'},'進 '+subLabel(subOf(c))):null,store.owner?forceControls(c,subOf(c),v=>forceLive(c.id,v)):null)))}
+      h('div',{class:'who'},'Spieler: '+((ps[id]&&ps[id].name)||(id===store.uid?'du':'jemand aus der Gruppe'))),subOf(c)?h('div',{class:'who',style:'color:var(--shu)'},'進 '+subLabel(subOf(c))):null,null)))}
   if(!n)box.append(h('p',{class:'note'},store.mode==='db'?'Noch hat niemand einen Charakter angelegt.':'Die Gruppenansicht braucht die gemeinsame Rolle. Öffne die Seite angemeldet über den geteilten Link.'))}
 function viewParty(){const box=h('div',{class:'party'});viewPartyFill(box);return h('div',{},h('div',{class:'label'},'団 · Die Gruppe'),h('h1',{style:'font-size:32px;margin:6px 0 18px'},'Alle Charaktere der Runde'),box)}
 
@@ -1425,16 +1496,16 @@ function openCreate(){let st={step:1,raceId:null,classId:null,name:'',clan:'Ōto
       const g=h('input',{type:'checkbox',id:'cGear'});g.checked=st.gear;g.addEventListener('change',()=>{st.gear=g.checked});
       d.append(h('label',{style:'display:flex;gap:8px;margin-top:16px;align-items:center'},g,'Gemeinsame Ausrüstung, Clan-Kleidung und 10 Gold ins Inventar legen'));
       d.append(h('p',{class:'note'},`Hit Points auf Stufe 1: ${cl.hd} (voller Hit Die) + CON-Modifier${r.id==='mensch'?' + 1 (Zäh)':''}.`))}
-    if(st.step===4){profStep(d,st,draw);classStep(d,st,draw)}
+    if(st.step===4){profStep(d,st,draw);gearStep(d,st,draw);classStep(d,st,draw)}
     if(st.step===5){d.append(h('p',{class:'note'},'Schreib drei Namen auf. Diese drei Menschen werden vorkommen. Manche Klassen bauen ihre Mechanik direkt darauf auf, und alle anderen gewinnen dadurch. Gib ihnen Namen, keine Rollen: nicht „meine Schwester“, sondern einen Namen.'));
       REL3.forEach((rel,i)=>{const n=st.names[i];const a=h('input',{id:'n3-'+i,value:n.name,placeholder:'Name'});a.addEventListener('input',()=>{n.name=a.value;okBtn.disabled=!valid()});
         const b=h('input',{id:'n3w-'+i,value:n.wer,placeholder:'Wer ist das? (optional)'});b.addEventListener('input',()=>{n.wer=b.value});
         d.append(h('div',{class:'fields',style:'margin-top:14px'},h('div',{class:'field'},h('label',{for:'n3-'+i},rel),a),h('div',{class:'field'},h('label',{for:'n3w-'+i},'Notiz'),b)))})}
-    const valid=()=>st.step===1?!!st.raceId:st.step===2?!!st.classId:st.step===4?!!(profStepValid(st)&&classStepValid(st)):st.step===5?st.names.every(n=>n.name.trim()):(st.name.trim()&&(!R[st.raceId].choose||st.raceChoice.length===2)&&(!(RACE_SK[st.raceId]&&RACE_SK[st.raceId].choose)||(st.raceSkills||[]).length===1)&&(!C[st.classId].skills.n||st.skills.length===C[st.classId].skills.n));
+    const valid=()=>st.step===1?!!st.raceId:st.step===2?!!st.classId:st.step===4?!!(profStepValid(st)&&gearValid(st)&&classStepValid(st)):st.step===5?st.names.every(n=>n.name.trim()):(st.name.trim()&&(!R[st.raceId].choose||st.raceChoice.length===2)&&(!(RACE_SK[st.raceId]&&RACE_SK[st.raceId].choose)||(st.raceSkills||[]).length===1)&&(!C[st.classId].skills.n||st.skills.length===C[st.classId].skills.n));
     const okBtn=h('button',{class:'btn',type:'button',disabled:!valid(),onclick:()=>{if(st.step<5){st.step++;draw();d.scrollTop=0}else create(st)}},st.step<5?'Weiter':'Siegel setzen');
     d.append(h('div',{class:'foot'},h('button',{class:'btn ghost',type:'button',onclick:()=>{if(st.step>1){st.step--;draw()}else closeModal()}},st.step>1?'Zurück':'Abbrechen'),okBtn))};draw()})}
 function create(st){const c={id:uid(),name:st.name.trim(),raceId:st.raceId,classId:st.classId,clan:st.clan,level:1,base:{...st.base},raceChoice:st.raceChoice,raceSkills:st.raceSkills||[],skills:st.skills,levels:[],bonds:[],inv:[],gold:0,notes:'',names:st.names.map((n,i)=>({rel:REL3[i],name:n.name.trim(),wer:n.wer.trim()})),created:Date.now()};
-  classStepApply(c,st);profStepApply(c,st);c.hp=hpMax(c);c.soul=soulMax(c);S.chars.push(c);S.sel=c.id;S.tab='sheet';S.party=false;closeModal();if(st.gear)addCommon(c);else{save();render()}toast('Siegel gesetzt: '+c.name)}
+  classStepApply(c,st);profStepApply(c,st);gearApply(c,st);c.hp=hpMax(c);c.soul=soulMax(c);S.chars.push(c);S.sel=c.id;S.tab='sheet';S.party=false;closeModal();if(st.gear)addCommon(c);else{save();render()}toast('Siegel gesetzt: '+c.name)}
 
 $('#newBtn').addEventListener('click',openCreate);
 $('#partyBtn').addEventListener('click',()=>{S.party=!S.party;S.dm=false;render()});
