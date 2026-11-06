@@ -359,12 +359,13 @@ function viewSheet(c){const cl=C[c.classId];const m=mods(c);const pb=prof(c.leve
     h('div',{class:'vital'},h('div',{class:'label'},'Armor Class'),h('div',{class:'big'},acOf(c)),h('div',{class:'note'},'aus angelegter Rüstung')),
     h('div',{class:'vital'},h('div',{class:'label'},'Initiative'),h('div',{class:'big'},sgn(m.dex)),h('div',{class:'note'},'Speed: '+(r=>{const x=r.attr.match(/(\d+) ft\./);return x?x[1]+' ft.':'—'})(R[c.raceId]))));
   w.append(sec('命','Lebenskraft',vit,h('p',{class:'note'},'Soul HP = 2 + Stufe + Summe aller sechs Ability Modifier, mindestens 1.'+(c.raceId==='mensch'?' Zäh: +1 Hit Point pro Stufe ist eingerechnet.':''))));
-  const profs=new Set([...(c.skills||[]),...(cl.skills.fixed||[]),...(c.extraSkills||[])]);
+  const profs=profSet(c);
   const sk=h('div',{class:'skills'});for(const s of DATA.skills){const p=profs.has(s);sk.append(h('div',{class:'sk'+(p?' p':'')},h('span',{},s+' ',h('small',{style:'color:var(--sumi-3)'},ABN[SKILLAB[s]])),h('span',{},sgn(m[SKILLAB[s]]+(p?pb:0)))))}
   const extra=h('div',{class:'addrow'},h('select',{id:'xskill','aria-label':'Weitere Skill-Proficiency'},h('option',{value:''},'Weitere Proficiency (Rasse, Lehre …)'),DATA.skills.filter(s=>!profs.has(s)).map(s=>h('option',{value:s},s))),
     h('button',{class:'btn ghost small',type:'button',onclick:()=>{const v=$('#xskill').value;if(v)upd(c=>{c.extraSkills=[...(c.extraSkills||[]),v]})}},'Hinzufügen'),
     (c.extraSkills||[]).length?h('button',{class:'btn ghost small',type:'button',onclick:()=>upd(c=>{c.extraSkills=[]})},'Zusätzliche entfernen'):null);
-  w.append(sec('技','Skills',sk,extra));
+  {const rs=RACE_SK[c.raceId];if(rs&&rs.choose&&!(c.raceSkills||[]).length){const rp=raceSkillPick(c.raceId,c.raceSkills,v=>upd(c=>{c.raceSkills=v}));if(rp){rp.prepend(h('p',{class:'note',style:'color:var(--shu);font-weight:700'},'Deine Rasse gibt dir noch eine Skill-Proficiency:'));w.append(sec('種','Rassen-Skill',rp))}}}
+  w.append(sec('技','Skills',sk,extra,raceSkills(c).length?h('p',{class:'note'},'Von deiner Rasse: '+raceSkills(c).join(', ')+'.'):''));
   const b=cl.basics;const kv=h('dl',{class:'kv'});const dv=c.dec||{};const pv=k=>{if(k==='Weapon Proficiencies'){const base=c.classId==='ninja'&&(dv.nprof||[]).length?'Gewählt: '+dv.nprof.join(', '):b[k];const ex=[...(c.raceId==='oni'?['Kanabō (Oni)']:[]),...(dv.xweap||[]).map(n=>n===dv.tengu?n+' (Tengu)':n)];return base+(ex.length?' · zusätzlich: '+ex.join(', '):'')}if(k==='Armor Proficiencies'&&dv.armor)return dv.armor+' (gewählt)';return b[k]};for(const k of['Saving Throws','Weapon Proficiencies','Armor Proficiencies','Tools','Primärattribut','Ressourcen']){if(b[k])kv.append(h('dt',{},k),h('dd',{},pv(k)))}
   w.append(sec('得','Proficiencies',kv));
   const notes=h('textarea',{id:'notes',rows:'5',style:'width:100%;padding:10px;border:1px solid var(--line);border-radius:3px;background:var(--paper)','aria-label':'Notizen',placeholder:'Hintergrund, Eide, Namen, Gegenmittel …'});notes.value=c.notes||'';
@@ -515,7 +516,7 @@ function pdfSheet(c){const cl=C[c.classId],r=R[c.raceId],m=mods(c),pb=prof(c.lev
   w.append(H('Werte','値'),grid(6,...AB.map(a=>box(ABN[a],score(c,a),sgn(m[a])))));
   w.append(h('div',{style:'height:6px'}),grid(6,box('Hit Points',(c.hp??hpMax(c))+' / '+hpMax(c)),box('Soul HP',(c.soul??soulMax(c))+' / '+soulMax(c)),box('Armor Class',acOf(c)),box('Initiative',sgn(m.dex)),box('Proficiency',sgn(pb)),box('Hit Die','1d'+cl.hd)));
   if(c.corr)w.append(h('p',{style:'color:#b0302a;font-weight:700;margin:6px 0 0'},'Corruption aktiv.'));
-  const profs=new Set([...(c.skills||[]),...(cl.skills.fixed||[]),...(c.extraSkills||[])]);
+  const profs=profSet(c);
   w.append(H('Skills','技'),h('div',{style:'columns:3;column-gap:18px'},...DATA.skills.map(s=>{const p=profs.has(s);return h('div',{style:'display:flex;justify-content:space-between;'+(p?'font-weight:700':'color:#4a443d')},h('span',{},(p?'● ':'○ ')+s),h('span',{},sgn(m[SKILLAB[s]]+(p?pb:0))))})));
   const dv=c.dec||{};const b=cl.basics;
   const wp=(c.classId==='ninja'&&(dv.nprof||[]).length?'Gewählt: '+dv.nprof.join(', '):b['Weapon Proficiencies']||'—')+(()=>{const ex=[...(c.raceId==='oni'?['Kanabō (Oni)']:[]),...(dv.xweap||[])];return ex.length?' · zusätzlich: '+ex.join(', '):''})();
@@ -579,7 +580,7 @@ function dmRemove(c){modal(d=>d.append(h('h2',{},'„'+(c.name||'Ohne Namen')+'�
 function viewDm(){const w=h('div');
   w.append(h('div',{class:'label'},'観 · Sammlung'),h('h1',{style:'font-size:32px;margin:6px 0 6px'},'Importierte Charakterbögen'),
     h('p',{class:'note',style:'margin-bottom:14px'},'Lade hier die Dateien oder PDFs deiner Spieler. Lädst du einen Bogen erneut, wird er aktualisiert; deine Notizen bleiben. Alles bleibt nur in diesem Browser.'),
-    h('div',{class:'addrow',style:'margin-bottom:18px'},h('button',{class:'btn',type:'button',id:'dmAddBtn',onclick:dmAdd},'＋ Bögen hinzufügen')));
+    h('div',{class:'addrow',style:'margin-bottom:18px'},h('button',{class:'btn',type:'button',id:'dmAddBtn',onclick:dmAdd},'＋ Bögen hinzufügen'),h('button',{class:'btn ghost',type:'button',id:'dmRepoBtn',onclick:dmLoadRepo},'⟳ Charaktere der Runde laden')));
   if(!DM.chars.length){w.append(h('p',{class:'note'},'Noch keine Bögen in der Sammlung.'));return w}
   if(!DM.chars.find(x=>x.id===S.dmSel))S.dmSel=DM.chars[0].id;
   const list=h('div',{class:'party',style:'margin-bottom:22px'});
@@ -1008,6 +1009,25 @@ function forceControls(c,cur,apply){const r=c.raceId;const box=h('div',{class:'a
 async function forceLive(charId,v){store.forced={...(store.forced||{})};if(v)store.forced[charId]=v;else store.forced[charId]={sub:null};render();
   try{await store.db.doc('forced/all').set({chars:store.forced,updated:Date.now()});toast(v?'Erzwungen: '+subLabel(v):'Unterrasse zurückgenommen')}catch(e){toast('Speichern ging nicht ('+(e&&e.code||'Fehler')+')')}}
 
+/* race skill proficiencies (Rassen-Dokument) */
+const RACE_SK={oni:{fixed:['Intimidation'],src:'Wächter der Hölle'},tengu:{fixed:['Perception'],src:'Scharfer Blick'},yamabiko:{fixed:['Perception'],src:'Gehör des Tals'},tanuki:{choose:['Deception','Performance'],src:'Unbekümmert'},bakeneko:{choose:['Stealth','Acrobatics'],src:'Katzensinn'},rokurokubi:{choose:['Perception','Investigation'],src:'Nachtwandler'},mensch:{any:true,src:'Erbe der Eskorte',note:'Ein Skill oder ein Werkzeug deiner Wahl, das zu deinem Clan passt. Wählst du ein Werkzeug, trag es in deine Notizen ein.'}};
+function raceSkills(c){const r=RACE_SK[c.raceId];if(!r)return[];return[...(r.fixed||[]),...(c.raceSkills||[])]}
+function profSet(c){const cl=C[c.classId];return new Set([...(c.skills||[]),...(cl.skills.fixed||[]),...(c.extraSkills||[]),...raceSkills(c)])}
+function raceSkillPick(raceId,cur,set){const r=RACE_SK[raceId];if(!r||r.fixed)return null;const opts=r.any?DATA.skills:r.choose;
+  return h('div',{style:'margin-top:14px'},h('h3',{style:'margin:0 0 6px;font-size:18px'},R[raceId].name+': '+r.src+(r.any?' · optional':' · wähle 1')),h('div',{class:'pick'},opts.map(s=>h('button',{class:'pill',type:'button','aria-pressed':String((cur||[]).includes(s)),onclick:()=>set((cur||[]).includes(s)?[]:[s])},s))),r.note?h('p',{class:'note'},r.note):null)}
+/* characters stored in the repository (GitHub Pages) */
+function importChar(ch,src){const ex=S.chars.find(y=>y.id===ch.id);
+  const add=asCopy=>{const x=JSON.parse(JSON.stringify(ch));if(asCopy)x.id=uid();const i=S.chars.findIndex(y=>y.id===x.id);if(i>=0)S.chars[i]=x;else S.chars.push(x);S.sel=x.id;S.tab='sheet';S.party=false;S.dm=false;closeModal();save();render();toast('Geladen: '+(x.name||'Charakter'))};
+  if(!ex)return add(false);
+  modal(d=>d.append(h('h2',{},'„'+(ch.name||'Ohne Namen')+'“ ist schon auf deiner Rolle'),h('p',{class:'note'},`Auf deiner Rolle: Stufe ${ex.level}. ${src||'Neu'}: Stufe ${ch.level}. Ersetzen überschreibt deinen Stand.`),
+    h('div',{class:'foot'},h('button',{class:'btn ghost',type:'button',onclick:closeModal},'Meinen behalten'),h('button',{class:'btn',type:'button',onclick:()=>add(false)},'Ersetzen'))))}
+async function repoChar(name){const r=await fetch('charaktere/'+encodeURIComponent(name)+'.json',{cache:'no-store'});if(!r.ok)throw new Error('404');const o=await r.json();const ch=validChar(o&&o.char?o.char:o);if(!ch)throw new Error('bad');return ch}
+async function loadFromUrl(){let q=null;try{q=new URLSearchParams(location.search).get('char')}catch(e){}if(!q)return;
+  try{const ch=await repoChar(q);importChar(ch,'Aus dem Link')}catch(e){toast('Charakter „'+q+'“ wurde nicht gefunden')}
+  try{history.replaceState(null,'',location.pathname)}catch(e){}}
+async function dmLoadRepo(){try{const r=await fetch('charaktere/index.json',{cache:'no-store'});if(!r.ok)throw 0;const list=await r.json();let n=0;
+    for(const e of list){try{const ch=await repoChar(e.file||e);const i=DM.chars.findIndex(y=>y.id===ch.id);if(i>=0)DM.chars[i]=ch;else DM.chars.push(ch);DM.added[ch.id]=Date.now();n++}catch(x){}}
+    dmSave();render();toast(n+' Charakter'+(n===1?'':'e')+' aus dem Repo geladen')}catch(e){toast('Keine Charakterliste gefunden. Das geht nur auf der GitHub-Seite.')}}
 function abSel(k,st,draw,c){const s=h('select',{id:'asi-'+k,'aria-label':'Attribut'},h('option',{value:''},'Attribut wählen'),AB.map(a=>{const lim=score(c,a)+(st.asiMode==='one'?2:1)>20;return h('option',{value:a,disabled:lim,selected:st[k]===a},ABN[a]+' ('+score(c,a)+')')}));s.addEventListener('change',()=>{st[k]=s.value;draw()});return s}
 
 /* inventory */
@@ -1337,7 +1357,7 @@ function openCreate(){let st={step:1,raceId:null,classId:null,name:'',clan:'Ōto
       h('div',{class:'steps'},['1 · Rasse','2 · Klasse','3 · Werte','4 · Klassenwahl','5 · Wen du kennst'].map((t,i)=>h('span',{class:st.step===i+1?'on':''},t))));
     if(st.step===1){let g='';const wrap=h('div');
       for(const r of DATA.races){if(r.group!==g){g=r.group;wrap.append(h('div',{class:'grp'},g==='Mensch'?'人 Mensch':g==='Wandler'?'変 Die Wandler':'霊 Die Naturgeister'));wrap.append(h('div',{class:'choices','data-g':g}))}
-        wrap.lastChild.append(h('button',{class:'choice',type:'button','aria-pressed':String(st.raceId===r.id),onclick:()=>{st.raceId=r.id;if(st.classId==='hanyo'&&r.id!=='mensch')st.classId=null;draw()}},h('span',{class:'kj'},r.kanji),h('span',{class:'nm'},r.name),h('span',{class:'sm'},r.attr.replace('Attribute: ','').split(' · ')[0])))}
+        wrap.lastChild.append(h('button',{class:'choice',type:'button','aria-pressed':String(st.raceId===r.id),onclick:()=>{st.raceId=r.id;st.raceSkills=[];if(st.classId==='hanyo'&&r.id!=='mensch')st.classId=null;draw()}},h('span',{class:'kj'},r.kanji),h('span',{class:'nm'},r.name),h('span',{class:'sm'},r.attr.replace('Attribute: ','').split(' · ')[0])))}
       d.append(wrap);if(st.raceId){const r=R[st.raceId];const p=h('div',{class:'preview'},h('div',{class:'label'},'Stufe 1 · '+r.name),h('p',{class:'note'},r.attr));p.append(renderLines((r.levels['1']||[]).map(x=>x.h?'## '+x.h:x.t)));d.append(p)}}
     if(st.step===2){const wrap=h('div',{class:'choices'});
       for(const cl of DATA.classes){const dis=cl.onlyRace&&cl.onlyRace!==st.raceId;wrap.append(h('button',{class:'choice',type:'button',disabled:dis,'aria-pressed':String(st.classId===cl.id),onclick:()=>{st.classId=cl.id;st.skills=[];st.dec={};draw()}},h('span',{class:'kj'},cl.kanji),h('span',{class:'nm'},cl.name),h('span',{class:'sm'},'Hit Die 1d'+cl.hd+(dis?' · nur Mensch':''))))}
@@ -1353,6 +1373,7 @@ function openCreate(){let st={step:1,raceId:null,classId:null,name:'',clan:'Ōto
         ab.append(h('div',{class:'field pb'},h('label',{},ABK[a]+' '+ABN[a]),h('div',{class:'pbrow'},h('button',{type:'button',class:'pbb','aria-label':ABN[a]+' senken',disabled:v<=8,onclick:()=>{st.base[a]--;draw()}},'−'),h('span',{class:'pbv',id:'b-'+a},v),h('button',{type:'button',class:'pbb','aria-label':ABN[a]+' erhöhen',disabled:v>=15||nextCost>left,onclick:()=>{st.base[a]++;draw()}},'+')),
           h('div',{class:'tot'},(b?'+'+b+' → ':'')+s+' ('+sgn(mod(s))+')'),h('div',{class:'tot'},'Kosten '+COST[v])))}
       d.append(ab);
+      {const rp=raceSkillPick(st.raceId,st.raceSkills,v=>{st.raceSkills=v;draw()});if(rp)d.append(rp);if(RACE_SK[st.raceId]&&RACE_SK[st.raceId].fixed)d.append(h('p',{class:'note',style:'margin-top:12px'},R[st.raceId].name+' ('+RACE_SK[st.raceId].src+'): Proficiency mit '+RACE_SK[st.raceId].fixed.join(', ')+'.'))}
       if(r.choose){d.append(h('p',{class:'note',style:'margin-top:12px'},'Mensch: +1 auf zwei Attribute deiner Wahl.'),h('div',{class:'pick'},AB.map(a=>h('button',{class:'pill',type:'button','aria-pressed':String(st.raceChoice.includes(a)),disabled:!st.raceChoice.includes(a)&&st.raceChoice.length>=2,onclick:()=>{st.raceChoice=st.raceChoice.includes(a)?st.raceChoice.filter(x=>x!==a):[...st.raceChoice,a];draw()}},ABN[a]))))}
       if(cl.skills.n){d.append(h('h3',{style:'margin:18px 0 6px;font-size:18px'},`Skills · wähle ${cl.skills.n}`),h('div',{class:'pick'},cl.skills.from.map(s=>h('button',{class:'pill',type:'button','aria-pressed':String(st.skills.includes(s)),disabled:!st.skills.includes(s)&&st.skills.length>=cl.skills.n,onclick:()=>{st.skills=st.skills.includes(s)?st.skills.filter(x=>x!==s):[...st.skills,s];draw()}},s))))}
       else if(cl.skills.fixed)d.append(h('p',{class:'note',style:'margin-top:12px'},'Skills: '+cl.skills.fixed.join(', ')));
@@ -1364,15 +1385,15 @@ function openCreate(){let st={step:1,raceId:null,classId:null,name:'',clan:'Ōto
       REL3.forEach((rel,i)=>{const n=st.names[i];const a=h('input',{id:'n3-'+i,value:n.name,placeholder:'Name'});a.addEventListener('input',()=>{n.name=a.value;okBtn.disabled=!valid()});
         const b=h('input',{id:'n3w-'+i,value:n.wer,placeholder:'Wer ist das? (optional)'});b.addEventListener('input',()=>{n.wer=b.value});
         d.append(h('div',{class:'fields',style:'margin-top:14px'},h('div',{class:'field'},h('label',{for:'n3-'+i},rel),a),h('div',{class:'field'},h('label',{for:'n3w-'+i},'Notiz'),b)))})}
-    const valid=()=>st.step===1?!!st.raceId:st.step===2?!!st.classId:st.step===4?!!(profStepValid(st)&&classStepValid(st)):st.step===5?st.names.every(n=>n.name.trim()):(st.name.trim()&&(!R[st.raceId].choose||st.raceChoice.length===2)&&(!C[st.classId].skills.n||st.skills.length===C[st.classId].skills.n));
+    const valid=()=>st.step===1?!!st.raceId:st.step===2?!!st.classId:st.step===4?!!(profStepValid(st)&&classStepValid(st)):st.step===5?st.names.every(n=>n.name.trim()):(st.name.trim()&&(!R[st.raceId].choose||st.raceChoice.length===2)&&(!(RACE_SK[st.raceId]&&RACE_SK[st.raceId].choose)||(st.raceSkills||[]).length===1)&&(!C[st.classId].skills.n||st.skills.length===C[st.classId].skills.n));
     const okBtn=h('button',{class:'btn',type:'button',disabled:!valid(),onclick:()=>{if(st.step<5){st.step++;draw();d.scrollTop=0}else create(st)}},st.step<5?'Weiter':'Siegel setzen');
     d.append(h('div',{class:'foot'},h('button',{class:'btn ghost',type:'button',onclick:()=>{if(st.step>1){st.step--;draw()}else closeModal()}},st.step>1?'Zurück':'Abbrechen'),okBtn))};draw()})}
-function create(st){const c={id:uid(),name:st.name.trim(),raceId:st.raceId,classId:st.classId,clan:st.clan,level:1,base:{...st.base},raceChoice:st.raceChoice,skills:st.skills,levels:[],bonds:[],inv:[],gold:0,notes:'',names:st.names.map((n,i)=>({rel:REL3[i],name:n.name.trim(),wer:n.wer.trim()})),created:Date.now()};
+function create(st){const c={id:uid(),name:st.name.trim(),raceId:st.raceId,classId:st.classId,clan:st.clan,level:1,base:{...st.base},raceChoice:st.raceChoice,raceSkills:st.raceSkills||[],skills:st.skills,levels:[],bonds:[],inv:[],gold:0,notes:'',names:st.names.map((n,i)=>({rel:REL3[i],name:n.name.trim(),wer:n.wer.trim()})),created:Date.now()};
   classStepApply(c,st);profStepApply(c,st);c.hp=hpMax(c);c.soul=soulMax(c);S.chars.push(c);S.sel=c.id;S.tab='sheet';S.party=false;closeModal();if(st.gear)addCommon(c);else{save();render()}toast('Siegel gesetzt: '+c.name)}
 
 $('#newBtn').addEventListener('click',openCreate);
 $('#partyBtn').addEventListener('click',()=>{S.party=!S.party;S.dm=false;render()});
 $('#dmBtn').addEventListener('click',()=>{S.dm=!S.dm;S.party=false;render()});
 $('#importBtn').addEventListener('click',importPdf);
-initStore();
+initStore();loadFromUrl();
 </script>

@@ -18,6 +18,13 @@ Web-App zum Erstellen und Verwalten von Charakteren für die Homebrew-Kampagne �
 - Export als kleine Datei (.json) oder als PDF; beides lässt sich wieder importieren
 - Sammlung für den Spielleiter: importierte Bögen der Spieler ansehen und zu jedem Charakter eigene Notizen schreiben
 
+## Charaktere der Runde
+
+Fertige Charaktere liegen im Ordner `charaktere/` (Format wie der Datei-Export) und sind in `charaktere/index.json` eingetragen.
+
+- Spieler laden ihren Charakter über einen Link: `https://pcln01.github.io/Character-creation-Homebrew-/?char=ryo`
+- Der Spielleiter lädt in der Sammlung mit „Charaktere der Runde laden“ alle auf einmal.
+
 ## Speicherung
 
 Charaktere, die Sammlung und die DM-Notizen werden nur im Browser gespeichert (localStorage). Spieler schicken dem Spielleiter ihren Charakter als Datei (.json) oder PDF; beides enthält alle Daten. DM-Notizen gehören nicht zum Bogen und werden nicht mit exportiert.
