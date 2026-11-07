@@ -979,11 +979,14 @@ function subView(c){const s=subOf(c);if(!s||!DATA.sub[s.sub])return null;const S
     const vl=h('div');for(const[lv,base,name,t]of S.verst){const on=lv<=c.level;vl.append(h('div',{class:'feat',style:on?'':'opacity:.5'},h('div',{class:'addrow',style:'align-items:center;flex-wrap:wrap'},h('span',{class:'lv'},'Stufe '+lv),h('b',{},base+' — '+name)),on?h('p',{class:'note',style:'margin:4px 0 0'},t):null))}
     w.append(card('Verstärkungen deiner Hitodama-Fähigkeiten',vl,NOTE(S.ohne)))}
   return w}
-function hasSkull(c){const rx=/sch[äa]del/i;return(c.inv||[]).some(i=>rx.test(i.n||''))||(ovOf(c).items||[]).some(i=>rx.test(i.n||''))}
+const SKULL_H=[3829396993,1254294344,813580293];
+function nameHash(s){s=String(s||'').normalize('NFC').toLowerCase().replace(/\s+/g,' ').trim();let h=0x811c9dc5;for(const ch of s){h^=ch.codePointAt(0);h=Math.imul(h,0x01000193)>>>0}return h}
+function isSkull(i){return SKULL_H.includes(nameHash(i&&i.n))}
+function hasSkull(c){return(c.inv||[]).some(i=>i.dm&&isSkull(i))||(ovOf(c).items||[]).some(isSkull)}
 function forceControls(c,cur,apply){const r=c.raceId;const box=h('div',{class:'addrow',style:'margin-top:8px;flex-wrap:wrap;align-items:center'});
   if(r==='kitsune'){const on=cur&&cur.sub==='moonfolk';box.append(h('span',{class:'note'},'Unterrasse:'),h('button',{class:'btn small'+(on?' ghost':''),type:'button',onclick:()=>apply(on?null:{sub:'moonfolk'})},on?'Moonfolk zurücknehmen':'Moonfolk erzwingen'))}
-  else if(r==='hitodama'){const st=cur&&cur.sub==='gashadokuro'?cur.stufe||1:0;const sk=hasSkull(c);box.append(h('span',{class:'note'},'Gashadokuro:'),h('div',{class:'pick'},[0,1,2,3].map(i=>h('button',{class:'pill',type:'button',disabled:!!(i&&!st&&!sk),title:i&&!st&&!sk?'Braucht den Schädel als Katalysator':'','aria-pressed':String(st===i),onclick:()=>apply(i?{sub:'gashadokuro',stufe:i}:null)},i?'Körperstufe '+['','I','II','III'][i]:'keine'))))}
-  else return null;if(r==='hitodama'&&!hasSkull(c)&&!(cur&&cur.sub==='gashadokuro'))box.append(h('p',{class:'note',style:'flex-basis:100%;margin:4px 0 0'},'Gesperrt: Die Verwandlung braucht den Schädel als Katalysator. Gib ihn dem Charakter über „Besonderes Item geben“ (ein Item mit „Schädel“ im Namen).'));return box}
+  else if(r==='hitodama'){const st=cur&&cur.sub==='gashadokuro'?cur.stufe||1:0;const sk=hasSkull(c);box.append(h('span',{class:'note'},'Gashadokuro:'),h('div',{class:'pick'},[0,1,2,3].map(i=>h('button',{class:'pill',type:'button',disabled:!!(i&&!st&&!sk),title:i&&!st&&!sk?'Braucht den bestimmten Schädel als Katalysator':'','aria-pressed':String(st===i),onclick:()=>apply(i?{sub:'gashadokuro',stufe:i}:null)},i?'Körperstufe '+['','I','II','III'][i]:'keine'))))}
+  else return null;if(r==='hitodama'&&!hasSkull(c)&&!(cur&&cur.sub==='gashadokuro'))box.append(h('p',{class:'note',style:'flex-basis:100%;margin:4px 0 0'},'Gesperrt: Die Verwandlung braucht den bestimmten Schädel aus deinem Drops-Dokument als Katalysator. Gib ihn über „Besonderes Item geben“ als eigenes Item mit genau seinem Namen.'));return box}
 async function forceLive(charId,v){if(store.mode==='drive')return driveForce(charId,v);store.forced={...(store.forced||{})};if(v)store.forced[charId]=v;else store.forced[charId]={sub:null};render();
   try{await store.db.doc('forced/all').set({chars:store.forced,updated:Date.now()});toast(v?'Erzwungen: '+subLabel(v):'Unterrasse zurückgenommen')}catch(e){toast('Speichern ging nicht ('+(e&&e.code||'Fehler')+')')}}
 
