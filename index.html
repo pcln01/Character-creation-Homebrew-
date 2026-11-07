@@ -1111,7 +1111,11 @@ function viewDm(){const w=h('div');
   w.append(h('div',{class:'label'},'観 · Sammlung des Spielleiters'),h('h1',{style:'font-size:32px;margin:6px 0 6px'},'Sammlung (DM)'));
   if(store.mode==='drive'&&!drive.dmpw){const box=h('div',{class:'party'});drivePartyLogin(box);w.append(box);return w}
   if(store.mode==='db'&&!store.owner){w.append(NOTE('Die Sammlung ist nur für den Spielleiter.'));return w}
-  if(store.mode==='drive'&&!drive.list){w.append(NOTE('Lädt die Charaktere aus Drive …'));driveList().then(()=>render()).catch(()=>{});return w}
+  if(store.mode==='drive'&&!drive.list){
+    if(drive.listErr){w.append(NOTE(drive.listErr),h('div',{class:'addrow'},h('button',{class:'btn',type:'button',onclick:()=>{drive.listErr=null;render()}},'Erneut versuchen'),h('button',{class:'btn ghost',type:'button',onclick:()=>{drive.listErr=null;drive.dmpw='';lsSet(DMPW_LS,null);render()}},'Abmelden')));return w}
+    w.append(NOTE('Lädt die Charaktere aus Drive …'));
+    if(!drive.loading){drive.loading=true;driveList().then(()=>{drive.loading=false;render()}).catch(e=>{drive.loading=false;if(e&&e.error==='forbidden'){drive.dmpw='';lsSet(DMPW_LS,null);drive.loginMsg='Das gespeicherte Passwort stimmt nicht mehr. Bitte neu anmelden.'}else drive.listErr='Drive nicht erreichbar ('+(e&&e.error||'keine Verbindung')+').';render()})}
+    return w}
   w.append(h('p',{class:'note',style:'margin-bottom:10px'},store.mode==='drive'?'Alle aktiven Charaktere aus deinem Google Drive, dazu Bögen, die du als Datei geladen hast. Deine Notizen bleiben in diesem Browser.':store.mode==='db'?'Alle Charaktere der Gruppe, dazu Bögen, die du als Datei geladen hast.':'Lade hier die Dateien oder PDFs deiner Spieler. Was du hier vergibst, bekommt der Spieler über die exportierte Datei.'),
     h('div',{class:'addrow',style:'margin-bottom:18px;flex-wrap:wrap'},h('button',{class:'btn',type:'button',id:'dmAddBtn',onclick:dmAdd},'＋ Bögen hinzufügen'),store.mode==='drive'?h('button',{class:'btn ghost',type:'button',onclick:()=>{drive.list=null;render()}},'⟳ Aus Drive aktualisieren'):null,store.mode==='drive'?h('button',{class:'btn ghost',type:'button',onclick:()=>{drive.dmpw='';drive.list=null;lsSet(DMPW_LS,null);render()}},'Abmelden'):null));
   const all=dmSources();if(!all.length){w.append(NOTE('Noch keine Charaktere.'));return w}
@@ -1125,12 +1129,12 @@ function viewDm(){const w=h('div');
   const sel=all.find(x=>x.c.id===S.dmSel);const c=sel.c;
   const ta=h('textarea',{id:'dmNote',rows:'5',style:'width:100%;padding:10px;border:1px solid var(--line);border-radius:3px;background:var(--paper);color:var(--sumi);font:inherit','aria-label':'DM-Notizen zu '+(c.name||'diesem Charakter'),placeholder:'Was du dir zu diesem Charakter merken willst: Geheimnisse, Haken, offene Fäden …'});ta.value=DM.notes[c.id]||'';
   let t;ta.addEventListener('input',()=>{DM.notes[c.id]=ta.value;clearTimeout(t);t=setTimeout(dmSave,300)});ta.addEventListener('blur',()=>{DM.notes[c.id]=ta.value;dmSave()});
-  w.append(sec('記','DM-Notizen zu '+(c.name||'Ohne Namen'),ta,NOTE('Nur in diesem Browser, nie beim Spieler.')));
-  w.append(sec('師','Spielleiter-Werkzeuge für '+(c.name||'Ohne Namen'),dmTools(c,sel.src),sel.src==='local'?h('div',{class:'addrow',style:'margin-top:8px'},h('button',{class:'btn ghost small',type:'button',onclick:()=>exportJson({...c,dmo:ovOf(c)})},'⇩ Datei für den Spieler exportieren')):null));
   const sheetWrap=h('div',{style:'overflow-x:auto;border:1px solid var(--line);border-radius:var(--r)'});const sh=pdfSheet(c);sh.style.width='100%';sh.style.maxWidth='794px';sh.lastChild.remove();sheetWrap.append(sh);
   w.append(sec('書','Bogen',sheetWrap,h('div',{class:'addrow',style:'margin-top:12px'},h('button',{class:'btn ghost small',type:'button',onclick:()=>exportPdf(c)},'⇩ Als PDF'),sel.src==='local'?h('button',{class:'btn ghost small',type:'button',onclick:()=>dmRemove(c)},'Aus der Sammlung nehmen'):null)));
+  w.append(sec('記','DM-Notizen zu '+(c.name||'Ohne Namen'),ta,NOTE('Nur in diesem Browser, nie beim Spieler.')));
+  w.append(sec('師','Spielleiter-Werkzeuge für '+(c.name||'Ohne Namen'),dmTools(c,sel.src),sel.src==='local'?h('div',{class:'addrow',style:'margin-top:8px'},h('button',{class:'btn ghost small',type:'button',onclick:()=>exportJson({...c,dmo:ovOf(c)})},'⇩ Datei für den Spieler exportieren')):null));
   return w}
-function drivePartyLogin(box){const pw=h('input',{type:'password',id:'dmPw',placeholder:'DM-Passwort','aria-label':'DM-Passwort',autocomplete:'current-password'});const msg=h('p',{class:'note'});
+function drivePartyLogin(box){const pw=h('input',{type:'password',id:'dmPw',placeholder:'DM-Passwort','aria-label':'DM-Passwort',autocomplete:'current-password'});const msg=h('p',{class:'note',style:drive.loginMsg?'color:var(--shu)':''},drive.loginMsg||'');drive.loginMsg=null;
   const go=async()=>{msg.textContent='Prüft …';try{const r=await driveCall({action:'ping',dm:pw.value});if(r.ok&&r.dm){drive.dmpw=pw.value;lsSet(DMPW_LS,pw.value);msg.textContent='';await driveList();render()}else msg.textContent='Falsches Passwort.'}catch(e){msg.textContent='Drive nicht erreichbar.'}};
   pw.addEventListener('keydown',e=>{if(e.key==='Enter')go()});
   box.append(h('div',{class:'vital',style:'grid-column:1/-1;max-width:420px'},h('div',{class:'label'},'Nur für den Spielleiter'),h('p',{class:'note'},'Das Passwort prüft dein Skript bei Google, es steht nicht in dieser Seite.'),h('div',{class:'addrow'},pw,h('button',{class:'btn',type:'button',id:'dmPwBtn',onclick:go},'Anmelden')),msg))}
