@@ -1104,9 +1104,10 @@ function dropParse(doc){const b=doc.b||[];const head=b.find(x=>/^(HEADING1|TITLE
   const parts=[];for(const t of b.filter(x=>x.t==='table'))for(const r of t.rows){if(r.length<3)continue;const q=parseInt(r[1],10),m=parseInt(r[2],10);if(/^teil$/i.test(r[0])||!r[0]||!(q>0)||!(m>0))continue;parts.push({teil:r[0],q,per:m/q})}
   const gi=b.find(x=>/^Gesamt:/i.test(x.s||''));let special=null;const si=b.findIndex(x=>/^HEADING/.test(x.t)&&/Besonderes Teil/i.test(x.s));
   if(si>=0){const ps=[];for(let i=si+1;i<b.length&&!/^HEADING/.test(b[i].t);i++)if(b[i].s)ps.push(b[i].s);if(ps.length){const t=ps.join('\n');const nm=t.split(/\s\(|\.\s/)[0].trim();special={n:nm,d:t}}}
+  const extras=[];b.forEach((x,i)=>{if(/^HEADING/.test(x.t)&&/^Weiter(e|er) Drops?$/i.test(x.s))for(let j=i+1;j<b.length&&!/^HEADING/.test(b[j].t);j++)if(b[j].s){const t=b[j].s;extras.push({n:t.split(/\s\(|\.\s/)[0].trim(),d:t})}});
   const ai=b.find(x=>/^Artmaterial:/i.test(x.s||''));let art=null;if(ai){const t=ai.s.replace(/^Artmaterial:\s*/i,'').replace(/\s*\((Vorschlag|steht)[^)]*\)\s*\.?$/i,'').trim();const k=t.split(/\s[—–-]\s/);art={n:k[0].replace(/[.:]$/,'').trim(),d:k.slice(1).join(' — ').trim()}}
   const rank=/Boss/i.test(sub)?(/Miniboss/i.test(sub)?'Minibosse':'Bosse'):/Fußvolk/i.test(sub)?'Fußvolk':'Sonstige';const yart=((sub.match(/\(([^)]+)\)/)||[])[1]||name).trim();const cr=(sub.match(/CR\s*(\d+)/)||[])[1];
-  return{id:doc.id,name,sub,parts,total:gi?gi.s:'',special,art,rank,yart,cr:cr?+cr:null}}
+  return{id:doc.id,name,sub,parts,total:gi?gi.s:'',special,extras,art,rank,yart,cr:cr?+cr:null}}
 async function dropsLoad(){if(dropsSt.loading)return;dropsSt.loading=true;dropsSt.err=null;render();
   try{for(let i=0;i<6;i++){const r=await driveCall({action:'drops',dm:drive.dmpw},1);if(!r.ok)throw r;dropsSt.docs=(r.docs||[]).map(dropParse).sort((a,b)=>a.name.localeCompare(b.name,'de'));render();if(!r.more)break}}
   catch(e){const er=e&&e.error;dropsSt.err=er==='unknown_action'?'Dein Apps Script kennt die Drops noch nicht. Ersetze den Code durch die neue Code.gs und stelle eine neue Version bereit.':er==='no_folder'?'In deinem Google Drive gibt es keinen Ordner „Drops“.':er==='forbidden'?'Das DM-Passwort stimmt nicht mehr. Melde dich neu an.':/uthori|Berechtigung|permission/i.test(e&&e.message||'')?'Dem Apps Script fehlt die Berechtigung für Google Docs. Öffne den Apps-Script-Editor, wähle oben die Funktion „testDrops“, klick auf „Ausführen“ und erlaube den Zugriff. (Meldung: '+e.message+')':'Die Drops ließen sich nicht laden ('+(er||'offline')+(e&&e.message?': '+e.message:'')+'). Versuch es noch einmal.'}
@@ -1134,10 +1135,12 @@ function dropsPane(c,o,set,src){const w=h('div');
   if(d.total)box.append(h('p',{class:'note',style:'margin:6px 0 0'},d.total+(mul>1?' · hier verdoppelt':'')));
   const chk=(k,label,desc)=>{if(P[k]==null)P[k]=true;const x=h('input',{type:'checkbox',id:'drop-'+k});x.checked=P[k];x.addEventListener('change',()=>{P[k]=x.checked});return h('div',{style:'margin-top:8px'},h('label',{style:'display:flex;gap:6px;align-items:center'},x,h('b',{},label)),desc?h('p',{class:'note',style:'margin:2px 0 0 22px;white-space:pre-wrap'},desc):null)};
   if(d.special)box.append(chk('sp','Besonderes Teil: '+d.special.n,d.special.d));
+  d.extras.forEach((x,i)=>box.append(chk('ex'+i,'Weiterer Drop: '+x.n,x.d)));
   if(d.art)box.append(chk('art','Artmaterial: '+d.art.n,d.art.d));
   box.append(row(pbtn('Drops geben',()=>{const items=[];
     d.parts.forEach((p,i)=>{const q=+P['p'+i]||0;if(q>0)items.push({id:uid(),n:p.teil+' · '+d.name,d:'Yokai-Material, '+p.per+' je Stück',q,w:0,mat:{art:d.yart,n:q*p.per}})});
     if(d.special&&P.sp)items.push({id:uid(),n:d.special.n,d:d.special.d,q:1,w:0});
+    d.extras.forEach((x,i)=>{if(P['ex'+i])items.push({id:uid(),n:x.n,d:x.d,q:1,w:0})});
     if(d.art&&P.art)items.push({id:uid(),n:d.art.n,d:d.art.d||'Artmaterial · '+d.name,q:1,w:0});
     if(!items.length)return toast('Nichts ausgewählt');dropsSt.pick={};set(o=>{o.items=[...(o.items||[]),...items]})},{id:'dropsGive'})));
   w.append(box,NOTE(c.classId==='yokaihunter'?'Beim Yokai Hunter landen die Yokai-Materialien als Yokai-Teile der Art „'+d.yart+'“ in seinem Gegenmittel-Beutel, besonderes Teil und Artmaterial im Inventar.':'Alles landet im Inventar des Spielers, markiert als „vom Spielleiter“.'));
