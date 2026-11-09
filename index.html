@@ -1016,7 +1016,7 @@ function lsGet(k,d){try{const v=localStorage.getItem(k);return v?JSON.parse(v):d
 function lsSet(k,v){try{if(v==null)localStorage.removeItem(k);else localStorage.setItem(k,JSON.stringify(v))}catch(e){}}
 function charKey(id){const ks=lsGet(KEYS_LS,{});if(!ks[id]){ks[id]=uid()+uid()+uid();lsSet(KEYS_LS,ks)}return ks[id]}
 function adoptKey(ch){if(ch&&ch.syncKey){const ks=lsGet(KEYS_LS,{});ks[ch.id]=ch.syncKey;lsSet(KEYS_LS,ks)}if(ch)delete ch.syncKey;return ch}
-async function driveCall(body){const r=await fetch(DRIVE_URL,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify(body),redirect:'follow'});return r.json()}
+async function driveCall(body,tries=2){let last='offline';for(let i=0;i<tries;i++){const ctl=new AbortController();const tm=setTimeout(()=>ctl.abort(),30000);try{const r=await fetch(DRIVE_URL,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify(body),redirect:'follow',signal:ctl.signal});const t=await r.text();clearTimeout(tm);try{return JSON.parse(t)}catch(e){last='server'}}catch(e){clearTimeout(tm);last=e&&e.name==='AbortError'?'timeout':'offline'}}throw{error:last}}
 const ACT_LS='siegelrolle-active';
 function activeId(){let a=lsGet(ACT_LS,null);if(!S.chars.find(c=>c.id===a)){a=S.chars[0]?S.chars[0].id:null;lsSet(ACT_LS,a)}return a}
 function isActive(c){return store.mode==='drive'&&c.id===activeId()}
@@ -1081,10 +1081,12 @@ function dmView(c){const o=ovOf(c);const els=o.elements||[],races=o.races||[];if
     w.append(card('研 Erforschte Elemente',el))}
   return w}
 async function saveOverlay(c,o,src){try{
-    if(src==='drive'){const r=await driveCall({action:'force',dm:drive.dmpw,id:c.id,value:o});if(!r.ok)throw r;store.forced=r.forced||{};await driveList()}
+    if(src==='drive'){toast('Wird an Google Drive gesendet …');const r=await driveCall({action:'force',dm:drive.dmpw,id:c.id,value:o});if(!r.ok)throw r;store.forced=r.forced||{};await driveList()}
     else if(src==='db'){store.forced={...(store.forced||{}),[c.id]:o};await store.db.doc('forced/all').set({chars:store.forced,updated:Date.now()})}
     else{const x=DM.chars.find(y=>y.id===c.id);if(x){x.dmo=o;dmSave()}}
-    render();toast('Gespeichert'+(src==='local'?'. Exportiere die Datei für den Spieler.':'. Der Spieler bekommt es beim nächsten Abgleich.'))}catch(e){toast('Speichern ging nicht ('+(e&&e.error||e&&e.code||'offline')+')')}}
+    render();toast('Gespeichert'+(src==='local'?'. Exportiere die Datei für den Spieler.':'. Der Spieler bekommt es, sobald er die Siegelrolle mit diesem Charakter als aktivem Charakter offen hat.'))}catch(e){const er=e&&e.error||e&&e.code||'offline';
+    if(er==='forbidden'){drive.dmpw='';lsSet(DMPW_LS,null);drive.list=null;drive.loginMsg='Das DM-Passwort stimmt nicht mehr. Melde dich neu an und gib es noch einmal.';render();toast('Nicht gespeichert: DM-Passwort stimmt nicht')}
+    else toast(er==='timeout'||er==='offline'||er==='server'?'Nicht gespeichert: Google Drive hat nicht geantwortet. Versuch es gleich noch einmal.':'Nicht gespeichert ('+er+')')}}
 function knownCustomRaces(){const byName={};const who={};const nameOf=id=>{const s=dmSources().find(x=>x.c.id===id);return s?(s.c.name||'Ohne Namen'):null};
   const add=(cid,o)=>{for(const r of (o&&o.races)||[]){const k=r.name.trim().toLowerCase();if(!byName[k]||(r.traits||[]).length>=(byName[k].traits||[]).length)byName[k]=r;const n=nameOf(cid);if(n){who[k]=who[k]||new Set();who[k].add(n)}}};
   for(const[cid,o]of Object.entries(store.forced||{}))add(cid,o);for(const c of DM.chars)add(c.id,c.dmo);
@@ -1099,7 +1101,7 @@ function dmTools(c,src){const o=JSON.parse(JSON.stringify(ovOf(c)));const set=fn
   const fc=forceControls(c,subOf(c),v=>set(o=>{if(v){o.sub=v.sub;if(v.stufe)o.stufe=v.stufe;else delete o.stufe}else{o.sub=null;delete o.stufe}}));if(fc)w.append(card('進 Unterrasse',fc));
   const isel=h('select',{id:'giveItem','aria-label':'Item aus dem Katalog'},h('option',{value:''},'Aus dem Katalog …'),DATA.items.map(i=>h('option',{value:i.n},i.n+' ('+i.cat+')')));
   const iname=h('input',{id:'giveName',placeholder:'oder eigenes Item: Name'}),idesc=h('input',{id:'giveDesc',placeholder:'Beschreibung / Wirkung',style:'flex:1;min-width:200px'}),iw=nIn('giveW',0,0,999,64),iq=nIn('giveQ',1,1,99,56);
-  const il=h('div');(o.items||[]).forEach((it,i)=>il.append(row(h('b',{},(it.q>1?it.q+'× ':'')+it.n),h('span',{class:'note'},it.d||''),sbtn('✕',()=>set(o=>{o.items.splice(i,1)}),{'aria-label':'Aus der Liste nehmen'}))));
+  const il=h('div');(o.items||[]).forEach((it,i)=>il.append(row(h('b',{},(it.q>1?it.q+'× ':'')+it.n),(c.dmGot||[]).includes(it.id)?h('span',{class:'chip'},'✓ im Inventar'):h('span',{class:'chip shu',title:'Kommt an, sobald der Spieler die Siegelrolle mit diesem Charakter offen hat'},'unterwegs'),h('span',{class:'note'},it.d||''),sbtn('✕',()=>set(o=>{o.items.splice(i,1)}),{'aria-label':'Aus der Liste nehmen'}))));
   w.append(card('贈 Besonderes Item geben',row(isel),row(iname,idesc),row(h('label',{class:'note',for:'giveW'},'Gewicht lb.'),iw,h('label',{class:'note',for:'giveQ'},'Anzahl'),iq,
       pbtn('Geben',()=>{const cat=ITEM[isel.value];const n=cat?cat.n:iname.value.trim();if(!n)return toast('Wähle ein Item oder gib einen Namen ein');const it={id:uid(),n,d:idesc.value.trim()||(cat?cat.d:''),w:cat?cat.w:+iw.value||0,q:Math.max(1,+iq.value||1)};if(cat&&cat.armor)it.armor={...cat.armor};set(o=>{o.items=[...(o.items||[]),it]})},{id:'giveBtn'})),
     il.childNodes.length?h('div',{style:'margin-top:8px'},h('div',{class:'label'},'Bisher gegeben'),il):null,NOTE('Das Item landet beim nächsten Abgleich im Inventar des Spielers, markiert als „vom Spielleiter“. Danach verwaltet er es selbst; aus dieser Liste nehmen holt es nicht zurück.')));
