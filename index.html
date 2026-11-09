@@ -1052,14 +1052,30 @@ const GEAR={
   hanyo:{note:'Rüstung nach deiner Armor-Wahl, sofern sie die Klauen nicht behindert.',choose:[{k:'tanto',l:'Waffe (optional)',opts:[['Tantō',['Tantō']],['Keine, nur Klauen und Biss',[]]]}],fixed:D=>[...(D.armor==='Light'?['Hara-ate']:[]),'Unauffällige Alltagskleidung']},
   biwahoshi:{fixed:()=>['Bō','Biwa','Epos (leer)']},
   ninja:{choose:[{k:'waffe',l:'Startwaffe (Versatile)',opts:[['Katana',['Katana']],['Bō',['Bō']]]},{k:'spezial',l:'Spezialitem',opts:[['Disguise Kit',['Disguise Kit']],["Thieves' Tools",["Thieves' Tools"]],['Gaming Set',['Gaming Set']]]}],fixed:()=>['Hara-ate']}};
-function gearList(st){const g=GEAR[st.classId];if(!g)return[];const D=st.dec,G=st.gearPick||{};const out=[];
-  for(const ch of g.choose||[]){const o=ch.opts.find(x=>x[0]===G[ch.k]);if(o)out.push(...o[1])}
-  out.push(...g.fixed(D));return out.filter(n=>ITEM[n])}
-function gearStep(d,st,draw){const g=GEAR[st.classId];if(!g)return;st.gearPick=st.gearPick||{};const box=h('div',{style:'margin:4px 0 22px'});
-  box.append(h('h3',{style:'font-size:18px;margin-bottom:4px'},'Startausrüstung'),g.note?h('p',{class:'note'},g.note):'');
-  for(const ch of g.choose||[])box.append(h('div',{class:'label',style:'margin:10px 0 6px'},ch.l),h('div',{class:'pick'},ch.opts.map(([l])=>h('button',{class:'pill',type:'button','aria-pressed':String(st.gearPick[ch.k]===l),onclick:()=>{st.gearPick[ch.k]=st.gearPick[ch.k]===l?null:l;draw()}},l))));
+const isW=n=>ITEM[n]&&ITEM[n].cat==='Waffe';const isBody=n=>ITEM[n]&&ITEM[n].armor&&/^(light|medium|heavy)$/.test(ITEM[n].armor.type);const isShield=n=>ITEM[n]&&ITEM[n].armor&&ITEM[n].armor.type==='shield';const isBow=n=>/Hankyū|Daikyū/.test(n);
+function gearFreeK(st){return st.classId==='ninja'?[]:['waffe','tanto']}
+function gearPkg(st,G){const g=GEAR[st.classId];if(!g)return[];const out=[];for(const ch of g.choose||[]){const o=ch.opts.find(x=>x[0]===G[ch.k])||(gearFreeK(st).includes(ch.k)?ch.opts[0]:null);if(o)out.push(...o[1])}out.push(...g.fixed(st.dec));return out.filter(n=>ITEM[n])}
+function gearCap(st){const g=GEAR[st.classId];if(!g)return 0;const ws=gearFreeK(st);const chs=(g.choose||[]).filter(c=>ws.includes(c.k));let best=0;const combos=chs.length?chs[0].opts.map(o=>({[chs[0].k]:o[0]})):[{}];for(const G of combos)best=Math.max(best,gearPkg(st,G).filter(isW).length);return best}
+function gearProfOk(st,n){return isProf({classId:st.classId,raceId:st.raceId,dec:{nprof:st.dec.nprof||[],xweap:st.dec.tengu?[st.dec.tengu]:[]}},n)}
+function armorTypes(st){const t=(C[st.classId].basics['Armor Proficiencies']||'').toLowerCase();const out=[];
+  if(armorOpts(st.classId)){const a=(st.dec.armor||'').toLowerCase();if(/light/.test(a))out.push('light');if(/medium/.test(a))out.push('medium');if(/heavy/.test(a))out.push('heavy')}
+  else{if(/light/.test(t))out.push('light');if(/medium/.test(t))out.push('medium');if(/heavy/.test(t))out.push('heavy')}return out}
+function shieldOk(st){return /shield/i.test(C[st.classId].basics['Armor Proficiencies']||'')}
+function gearInit(st){const k=st.classId+'|'+st.raceId+'|'+JSON.stringify(st.dec||{})+'|'+JSON.stringify(st.gearPick||{});if(st.gw&&st.gwKey===k)return;st.gwKey=k;const pk=gearPkg(st,st.gearPick||{});st.gw=pk.filter(isW);st.ga=pk.find(isBody)||'';st.gs=pk.some(isShield)}
+function gearList(st){const g=GEAR[st.classId];if(!g)return[];gearInit(st);const pk=gearPkg(st,st.gearPick||{});
+  const rest=pk.filter(n=>!isW(n)&&!isBody(n)&&!isShield(n)&&!/^Pfeile/.test(n));const out=[...st.gw];
+  if(st.gw.some(isBow)&&ITEM['Pfeile (20)'])out.push('Pfeile (20)');if(st.ga&&armorTypes(st).includes(ITEM[st.ga].armor.type))out.push(st.ga);
+  const sh=Object.keys(ITEM).find(isShield);if(st.gs&&shieldOk(st)&&sh)out.push(sh);return[...out,...rest]}
+function gearStep(d,st,draw){const g=GEAR[st.classId];if(!g)return;st.gearPick=st.gearPick||{};gearInit(st);const box=h('div',{style:'margin:4px 0 22px'});
+  box.append(h('h3',{style:'font-size:18px;margin-bottom:4px'},'Startausrüstung'),h('p',{class:'note'},'Vorausgewählt ist das Startpaket aus deinem Klassendokument. Waffen und Rüstung darfst du tauschen.'));
+  for(const ch of(g.choose||[]).filter(c=>!gearFreeK(st).includes(c.k)))box.append(h('div',{class:'label',style:'margin:10px 0 6px'},ch.l),h('div',{class:'pick'},ch.opts.map(([l])=>h('button',{class:'pill',type:'button','aria-pressed':String(st.gearPick[ch.k]===l),onclick:()=>{st.gearPick[ch.k]=st.gearPick[ch.k]===l?null:l;draw()}},l))));
+  const cap=gearCap(st);const ws=DATA.items.filter(i=>i.cat==='Waffe'&&gearProfOk(st,i.n)).map(i=>i.n);
+  if(cap){box.append(h('div',{class:'label',style:'margin:10px 0 6px'},`Startwaffen · bis zu ${cap} (${st.gw.length} gewählt)`),h('div',{class:'pick'},ws.map(n=>{const on=st.gw.includes(n);return h('button',{class:'pill',type:'button','aria-pressed':String(on),id:'gw-'+n,disabled:!on&&st.gw.length>=cap,onclick:()=>{st.gw=on?st.gw.filter(x=>x!==n):[...st.gw,n];draw()}},n+' · '+ITEM[n].w+' lb.')})),h('p',{class:'note'},'Nur Waffen, die du beherrschst.'+(ws.some(isBow)?' Zu einem Bogen gibt es 20 Pfeile dazu.':'')))}
+  const at=armorTypes(st);if(at.length){const bodies=Object.keys(ITEM).filter(n=>isBody(n)&&at.includes(ITEM[n].armor.type));
+    box.append(h('div',{class:'label',style:'margin:10px 0 6px'},'Startrüstung'),h('div',{class:'pick'},[...bodies.map(n=>h('button',{class:'pill',type:'button','aria-pressed':String(st.ga===n),id:'ga-'+n,onclick:()=>{st.ga=n;draw()}},`${n} · ${ITEM[n].armor.type[0].toUpperCase()+ITEM[n].armor.type.slice(1)} · AC ${ITEM[n].armor.base} · ${ITEM[n].w} lb.`)),h('button',{class:'pill',type:'button','aria-pressed':String(!st.ga),id:'ga-none',onclick:()=>{st.ga='';draw()}},'Keine Rüstung')]))}
+  if(shieldOk(st)){const sh=Object.keys(ITEM).find(isShield);if(sh)box.append(h('div',{class:'pick',style:'margin-top:8px'},h('button',{class:'pill',type:'button','aria-pressed':String(!!st.gs),id:'gs',onclick:()=>{st.gs=!st.gs;draw()}},sh+' (Schild) · '+ITEM[sh].w+' lb.')))}
   const list=gearList(st);box.append(h('p',{class:'note',style:'margin-top:10px'},h('b',{},'Du bekommst: '),list.length?list.join(', '):'—'));d.append(box)}
-function gearValid(st){const g=GEAR[st.classId];if(!g)return true;return(g.choose||[]).every(ch=>(st.gearPick||{})[ch.k])}
+function gearValid(st){const g=GEAR[st.classId];if(!g)return true;gearInit(st);if(!(g.choose||[]).filter(c=>!gearFreeK(st).includes(c.k)).every(ch=>(st.gearPick||{})[ch.k]))return false;return st.gw.length<=gearCap(st)&&(st.gw.length>0||st.classId==='hanyo')}
 function gearApply(c,st){for(const n of gearList(st)){addItem(c,ITEM[n]);const it=c.inv.find(i=>i.n===n);const cat=ITEM[n].cat;if(cat==='Waffe'||(it.armor&&it.armor.type!=='clothes'))it.equipped=true}}
 /* ---------- Spielleiter-Zusätze: Items, Klassenelemente, Rassen ---------- */
 function ovOf(c){const r=(store.forced||{})[c.id];return r||c.dmo||{}}
