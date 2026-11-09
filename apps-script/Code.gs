@@ -237,3 +237,8 @@ function drops(req) {
   const docs = Object.keys(neu).map(function (id) { return { id: id, n: neu[id].n, b: neu[id].b }; });
   return { ok: true, docs: docs, more: mehr };
 }
+
+function testDrops() {
+  const r = drops({ dm: DM_PASSWORT });
+  Logger.log(JSON.stringify({ ok: r.ok, fehler: r.error || null, dokumente: r.docs ? r.docs.length : 0, nochNichtGelesen: !!r.more }));
+}
