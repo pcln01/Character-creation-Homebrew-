@@ -1071,6 +1071,7 @@ function dmTrackers(c){const o=ovOf(c);const out=[];
   for(const r of o.races||[])for(const t of r.traits||[])if(+t.uses>0&&(+t.lv||1)<=c.level)out.push({k:'cr:'+r.id+':'+t.id,l:t.name+' · '+r.name,max:+t.uses,reset:t.reset||'long',n:'Vom Spielleiter · ab Stufe '+(+t.lv||1)});
   return out}
 function deliverDm(){const got=[];for(const c of S.chars){const o=ovOf(c);for(const it of o.items||[]){c.dmGot=c.dmGot||[];if(c.dmGot.includes(it.id))continue;c.dmGot.push(it.id);
+      if(it.mat&&c.classId==='yokaihunter'){c.dec=c.dec||{};const t=(c.dec.teile=c.dec.teile||[]);const r=t.find(y=>y.art.toLowerCase()===it.mat.art.toLowerCase());if(r)r.n+=+it.mat.n||0;else t.push({art:it.mat.art,n:+it.mat.n||0});got.push((c.name||'Charakter')+': '+it.mat.n+' Yokai-Teile ('+it.mat.art+')');continue}
       const x={id:uid(),n:it.n,d:(it.d?it.d+' · ':'')+'vom Spielleiter',q:+it.q||1,w:+it.w||0,dm:true};if(it.armor)x.armor={...it.armor};if(!ITEM[it.n])x.custom=true;c.inv.push(x);got.push((c.name||'Charakter')+': '+it.n)}}
   if(got.length){save();render();toast('Vom Spielleiter erhalten · '+got.join(', '))}}
 function dmView(c){const o=ovOf(c);const els=o.elements||[],races=o.races||[];if(!els.length&&!races.length)return null;const w=h('div');
@@ -1097,12 +1098,58 @@ function raceAsCustom(rid,c){const r=R[rid];const pb=prof(c.level);const traits=
       const u=usesIn(use,pb)[0];traits.push({id:uid(),lv:gate,name,text:cells.join(' · '),uses:u?u.n:0,reset:u?u.reset:'long'});continue}
     const name=t.split(/\.\s/)[0].replace(/\s*\(.*?\)\s*$/,'').trim();const u=usesIn(t,pb)[0];traits.push({id:uid(),lv,name,text:t,uses:u?u.n:0,reset:u?u.reset:'long'})}
   return{id:uid(),name:r.name,text:r.attr+' (Attribute und Größe der zweiten Rasse gelten nicht automatisch.)',traits,from:rid}}
+let dmGiveTab='item';const dropsSt={docs:null,loading:false,err:null,q:'',sel:null,pick:{}};
+function dropParse(doc){const b=doc.b||[];const head=b.find(x=>/^(HEADING1|TITLE)$/.test(x.t)&&/^Drops/i.test(x.s));const name=((head&&head.s)||doc.n).replace(/^Drops[:\-\s]*/i,'').trim();
+  const hi=head?b.indexOf(head):-1;const sub=(b.slice(hi+1).find(x=>x.t==='NORMAL'&&x.s.includes('·'))||{}).s||'';
+  const parts=[];for(const t of b.filter(x=>x.t==='table'))for(const r of t.rows){if(r.length<3)continue;const q=parseInt(r[1],10),m=parseInt(r[2],10);if(/^teil$/i.test(r[0])||!r[0]||!(q>0)||!(m>0))continue;parts.push({teil:r[0],q,per:m/q})}
+  const gi=b.find(x=>/^Gesamt:/i.test(x.s||''));let special=null;const si=b.findIndex(x=>/^HEADING/.test(x.t)&&/Besonderes Teil/i.test(x.s));
+  if(si>=0){const ps=[];for(let i=si+1;i<b.length&&!/^HEADING/.test(b[i].t);i++)if(b[i].s)ps.push(b[i].s);if(ps.length){const t=ps.join('\n');const nm=t.split(/\s\(|\.\s/)[0].trim();special={n:nm,d:t}}}
+  const ai=b.find(x=>/^Artmaterial:/i.test(x.s||''));let art=null;if(ai){const t=ai.s.replace(/^Artmaterial:\s*/i,'').replace(/\s*\((Vorschlag|steht)[^)]*\)\s*\.?$/i,'').trim();const k=t.split(/\s[—–-]\s/);art={n:k[0].replace(/[.:]$/,'').trim(),d:k.slice(1).join(' — ').trim()}}
+  const rank=/Boss/i.test(sub)?(/Miniboss/i.test(sub)?'Minibosse':'Bosse'):/Fußvolk/i.test(sub)?'Fußvolk':'Sonstige';const yart=((sub.match(/\(([^)]+)\)/)||[])[1]||name).trim();const cr=(sub.match(/CR\s*(\d+)/)||[])[1];
+  return{id:doc.id,name,sub,parts,total:gi?gi.s:'',special,art,rank,yart,cr:cr?+cr:null}}
+async function dropsLoad(){if(dropsSt.loading)return;dropsSt.loading=true;dropsSt.err=null;render();
+  try{for(let i=0;i<6;i++){const r=await driveCall({action:'drops',dm:drive.dmpw},1);if(!r.ok)throw r;dropsSt.docs=(r.docs||[]).map(dropParse).sort((a,b)=>a.name.localeCompare(b.name,'de'));render();if(!r.more)break}}
+  catch(e){const er=e&&e.error;dropsSt.err=er==='unknown_action'?'Dein Apps Script kennt die Drops noch nicht. Ersetze den Code durch die neue Code.gs und stelle eine neue Version bereit.':er==='no_folder'?'In deinem Google Drive gibt es keinen Ordner „Drops“.':er==='forbidden'?'Das DM-Passwort stimmt nicht mehr. Melde dich neu an.':'Die Drops ließen sich nicht laden ('+(er||'offline')+'). Versuch es noch einmal.'}
+  dropsSt.loading=false;render()}
+function dropsPane(c,o,set,src){const w=h('div');
+  if(store.mode!=='drive'||!drive.dmpw){w.append(NOTE('Die Drops kommen aus deinem Drive-Ordner „Drops“ und brauchen die Verbindung zu Google Drive mit DM-Passwort.'));return w}
+  if(!dropsSt.docs&&!dropsSt.loading&&!dropsSt.err)setTimeout(dropsLoad,0);
+  if(dropsSt.err)w.append(h('p',{class:'note',style:'color:var(--shu)'},dropsSt.err),row(pbtn('Erneut laden',dropsLoad,{id:'dropsRetry'})));
+  if(!dropsSt.docs){w.append(NOTE(dropsSt.loading?'Lädt die Drop-Dokumente aus Drive … Beim ersten Mal kann das eine halbe Minute dauern.':''));return w}
+  const q=h('input',{id:'dropsQ',placeholder:'Gegner suchen','aria-label':'Gegner suchen',value:dropsSt.q,style:'flex:1;min-width:160px'});q.addEventListener('input',()=>{dropsSt.q=q.value;const pos=q.selectionStart;render();const n=document.getElementById('dropsQ');if(n){n.focus();n.setSelectionRange(pos,pos)}});
+  const list=dropsSt.docs.filter(d=>!dropsSt.q||(d.name+' '+d.sub).toLowerCase().includes(dropsSt.q.toLowerCase()));
+  const groups={};for(const d of list)(groups[d.rank]=groups[d.rank]||[]).push(d);
+  const sel=h('select',{id:'dropsSel','aria-label':'Gegner'},h('option',{value:''},list.length?'Gegner wählen … ('+list.length+')':'Kein Treffer'),['Bosse','Minibosse','Fußvolk','Sonstige'].filter(g=>groups[g]).map(g=>h('optgroup',{label:g},groups[g].map(d=>h('option',{value:d.id,selected:dropsSt.sel===d.id||null},d.name+(d.cr!=null?' · CR '+d.cr:''))))));
+  sel.addEventListener('change',()=>{dropsSt.sel=sel.value||null;dropsSt.pick={};render()});
+  w.append(row(q,sel,sbtn('↻',()=>{dropsSt.docs=null;dropsLoad()},{'aria-label':'Drops neu laden',title:'Drops neu aus Drive laden'})));
+  const d=dropsSt.docs.find(x=>x.id===dropsSt.sel);if(!d)return w;
+  const P=dropsSt.pick;const jb=(c.dec&&c.dec.jagdbuch||[]).some(e=>(e.art||'').toLowerCase()===d.yart.toLowerCase());
+  if(P.dbl==null)P.dbl=c.classId==='yokaihunter'&&jb;const mul=P.dbl?2:1;
+  const box=h('div',{class:'feat',style:'margin-top:8px'},h('b',{},d.name),h('p',{class:'note',style:'margin:2px 0 6px'},d.sub));
+  if(!d.parts.length)box.append(NOTE('Dieses Dokument nennt keine Ernte.'));
+  d.parts.forEach((p,i)=>{const k='p'+i;if(P[k]==null)P[k]=p.q*mul;const n=nIn('dropQ-'+i,P[k],0,99,56);n.addEventListener('change',()=>{P[k]=Math.max(0,+n.value||0)});
+    box.append(row(h('label',{for:'dropQ-'+i,style:'flex:1;min-width:150px'},p.teil),n,h('span',{class:'note'},'× '+p.per+' Material')))});
+  if(d.parts.length&&c.classId==='yokaihunter'){const x=h('input',{type:'checkbox',id:'dropDbl'});x.checked=P.dbl;x.addEventListener('change',()=>{const m=x.checked?2:1;P.dbl=x.checked;d.parts.forEach((p,i)=>P['p'+i]=p.q*m);render()});
+    box.append(h('label',{style:'display:flex;gap:6px;align-items:center;margin-top:6px'},x,'Fachgerecht zerlegen: doppelte Menge'+(jb?' (Art „'+d.yart+'“ steht im Jagdbuch)':' (Art „'+d.yart+'“ steht nicht im Jagdbuch)')))}
+  if(d.total)box.append(h('p',{class:'note',style:'margin:6px 0 0'},d.total+(mul>1?' · hier verdoppelt':'')));
+  const chk=(k,label,desc)=>{if(P[k]==null)P[k]=true;const x=h('input',{type:'checkbox',id:'drop-'+k});x.checked=P[k];x.addEventListener('change',()=>{P[k]=x.checked});return h('div',{style:'margin-top:8px'},h('label',{style:'display:flex;gap:6px;align-items:center'},x,h('b',{},label)),desc?h('p',{class:'note',style:'margin:2px 0 0 22px;white-space:pre-wrap'},desc):null)};
+  if(d.special)box.append(chk('sp','Besonderes Teil: '+d.special.n,d.special.d));
+  if(d.art)box.append(chk('art','Artmaterial: '+d.art.n,d.art.d));
+  box.append(row(pbtn('Drops geben',()=>{const items=[];
+    d.parts.forEach((p,i)=>{const q=+P['p'+i]||0;if(q>0)items.push({id:uid(),n:p.teil+' · '+d.name,d:'Yokai-Material, '+p.per+' je Stück',q,w:0,mat:{art:d.yart,n:q*p.per}})});
+    if(d.special&&P.sp)items.push({id:uid(),n:d.special.n,d:d.special.d,q:1,w:0});
+    if(d.art&&P.art)items.push({id:uid(),n:d.art.n,d:d.art.d||'Artmaterial · '+d.name,q:1,w:0});
+    if(!items.length)return toast('Nichts ausgewählt');dropsSt.pick={};set(o=>{o.items=[...(o.items||[]),...items]})},{id:'dropsGive'})));
+  w.append(box,NOTE(c.classId==='yokaihunter'?'Beim Yokai Hunter landen die Yokai-Materialien als Yokai-Teile der Art „'+d.yart+'“ in seinem Gegenmittel-Beutel, besonderes Teil und Artmaterial im Inventar.':'Alles landet im Inventar des Spielers, markiert als „vom Spielleiter“.'));
+  return w}
 function dmTools(c,src){const o=JSON.parse(JSON.stringify(ovOf(c)));const set=fn=>{fn(o);saveOverlay(c,o,src)};const w=h('div');
   const fc=forceControls(c,subOf(c),v=>set(o=>{if(v){o.sub=v.sub;if(v.stufe)o.stufe=v.stufe;else delete o.stufe}else{o.sub=null;delete o.stufe}}));if(fc)w.append(card('進 Unterrasse',fc));
   const isel=h('select',{id:'giveItem','aria-label':'Item aus dem Katalog'},h('option',{value:''},'Aus dem Katalog …'),DATA.items.map(i=>h('option',{value:i.n},i.n+' ('+i.cat+')')));
   const iname=h('input',{id:'giveName',placeholder:'oder eigenes Item: Name'}),idesc=h('input',{id:'giveDesc',placeholder:'Beschreibung / Wirkung',style:'flex:1;min-width:200px'}),iw=nIn('giveW',0,0,999,64),iq=nIn('giveQ',1,1,99,56);
   const il=h('div');(o.items||[]).forEach((it,i)=>il.append(row(h('b',{},(it.q>1?it.q+'× ':'')+it.n),(c.dmGot||[]).includes(it.id)?h('span',{class:'chip'},'✓ im Inventar'):h('span',{class:'chip shu',title:'Kommt an, sobald der Spieler die Siegelrolle mit diesem Charakter offen hat'},'unterwegs'),h('span',{class:'note'},it.d||''),sbtn('✕',()=>set(o=>{o.items.splice(i,1)}),{'aria-label':'Aus der Liste nehmen'}))));
-  w.append(card('贈 Besonderes Item geben',row(isel),row(iname,idesc),row(h('label',{class:'note',for:'giveW'},'Gewicht lb.'),iw,h('label',{class:'note',for:'giveQ'},'Anzahl'),iq,
+  const gTab=dmGiveTab;const tabs=h('div',{class:'pick',style:'margin:2px 0 8px'},[['item','Item'],['drops','Drops']].map(([k,l])=>h('button',{class:'pill',type:'button','aria-pressed':String(gTab===k),id:'giveTab-'+k,onclick:()=>{dmGiveTab=k;render()}},l)));
+  if(gTab==='drops')w.append(card('贈 Besonderes Item geben',tabs,dropsPane(c,o,set,src),il.childNodes.length?h('div',{style:'margin-top:8px'},h('div',{class:'label'},'Bisher gegeben'),il):null));
+  else w.append(card('贈 Besonderes Item geben',tabs,row(isel),row(iname,idesc),row(h('label',{class:'note',for:'giveW'},'Gewicht lb.'),iw,h('label',{class:'note',for:'giveQ'},'Anzahl'),iq,
       pbtn('Geben',()=>{const cat=ITEM[isel.value];const n=cat?cat.n:iname.value.trim();if(!n)return toast('Wähle ein Item oder gib einen Namen ein');const it={id:uid(),n,d:idesc.value.trim()||(cat?cat.d:''),w:cat?cat.w:+iw.value||0,q:Math.max(1,+iq.value||1)};if(cat&&cat.armor)it.armor={...cat.armor};set(o=>{o.items=[...(o.items||[]),it]})},{id:'giveBtn'})),
     il.childNodes.length?h('div',{style:'margin-top:8px'},h('div',{class:'label'},'Bisher gegeben'),il):null,NOTE('Das Item landet beim nächsten Abgleich im Inventar des Spielers, markiert als „vom Spielleiter“. Danach verwaltet er es selbst; aus dieser Liste nehmen holt es nicht zurück.')));
   const types=[...(EL_TYPES[c.classId]||[]),'Fähigkeit'];const tsel=h('select',{id:'elTyp','aria-label':'Typ'},types.map(t=>h('option',{value:t},t)));

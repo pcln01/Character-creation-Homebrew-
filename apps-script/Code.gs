@@ -13,8 +13,15 @@ function doPost(e) {
   } catch (x) {
     return antwort({ ok: false, error: 'bad_json' });
   }
+  if (req.action === 'drops') {
+    try {
+      return antwort(drops(req));
+    } catch (x) {
+      return antwort({ ok: false, error: 'server', message: String(x) });
+    }
+  }
   const lock = LockService.getScriptLock();
-  lock.waitLock(20000);
+  if (!lock.tryLock(20000)) return antwort({ ok: false, error: 'busy' });
   try {
     switch (req.action) {
       case 'ping': return antwort({ ok: true, dm: istDm(req) });
@@ -160,4 +167,73 @@ function erzwingen(req) {
   m[req.id] = req.value && typeof req.value === 'object' ? req.value : { sub: null };
   schreiben('_erzwungen.json', m);
   return { ok: true, forced: m };
+}
+
+function dropsOrdner() {
+  const it = DriveApp.getFoldersByName('Drops');
+  let erster = null;
+  while (it.hasNext()) {
+    const f = it.next();
+    if (f.isTrashed()) continue;
+    if (!erster) erster = f;
+    if (f.getFilesByName('Drops-Uebersicht').hasNext()) return f;
+  }
+  return erster;
+}
+
+function bloecke(body) {
+  const out = [];
+  const T = DocumentApp.ElementType;
+  for (let i = 0; i < body.getNumChildren(); i++) {
+    const el = body.getChild(i);
+    const t = el.getType();
+    if (t === T.TABLE) {
+      const tb = el.asTable();
+      const rows = [];
+      for (let r = 0; r < tb.getNumRows(); r++) {
+        const row = tb.getRow(r);
+        const cs = [];
+        for (let c = 0; c < row.getNumCells(); c++) cs.push(row.getCell(c).getText().trim());
+        rows.push(cs);
+      }
+      out.push({ t: 'table', rows: rows });
+    } else if (t === T.PARAGRAPH || t === T.LIST_ITEM) {
+      const s = el.getText().trim();
+      if (!s) continue;
+      out.push({ t: String(el.getHeading()), s: s });
+    }
+  }
+  return out;
+}
+
+function drops(req) {
+  if (!istDm(req)) return { ok: false, error: 'forbidden' };
+  const start = Date.now();
+  const ordnerD = dropsOrdner();
+  if (!ordnerD) return { ok: false, error: 'no_folder' };
+  const cache = lesen('_drops-cache.json') || {};
+  const neu = {};
+  let geaendert = false;
+  let mehr = false;
+  const it = ordnerD.getFilesByType(MimeType.GOOGLE_DOCS);
+  while (it.hasNext()) {
+    const f = it.next();
+    const name = f.getName();
+    if (f.isTrashed() || name.indexOf('Drops-') !== 0 || name === 'Drops-Uebersicht') continue;
+    const id = f.getId();
+    const u = f.getLastUpdated().getTime();
+    if (cache[id] && cache[id].u === u) {
+      neu[id] = cache[id];
+      continue;
+    }
+    if (Date.now() - start > 20000) {
+      mehr = true;
+      continue;
+    }
+    neu[id] = { u: u, n: name, b: bloecke(DocumentApp.openById(id).getBody()) };
+    geaendert = true;
+  }
+  if (geaendert || Object.keys(neu).length !== Object.keys(cache).length) schreiben('_drops-cache.json', neu);
+  const docs = Object.keys(neu).map(function (id) { return { id: id, n: neu[id].n, b: neu[id].b }; });
+  return { ok: true, docs: docs, more: mehr };
 }
