@@ -1016,7 +1016,7 @@ function lsGet(k,d){try{const v=localStorage.getItem(k);return v?JSON.parse(v):d
 function lsSet(k,v){try{if(v==null)localStorage.removeItem(k);else localStorage.setItem(k,JSON.stringify(v))}catch(e){}}
 function charKey(id){const ks=lsGet(KEYS_LS,{});if(!ks[id]){ks[id]=uid()+uid()+uid();lsSet(KEYS_LS,ks)}return ks[id]}
 function adoptKey(ch){if(ch&&ch.syncKey){const ks=lsGet(KEYS_LS,{});ks[ch.id]=ch.syncKey;lsSet(KEYS_LS,ks)}if(ch)delete ch.syncKey;return ch}
-async function driveCall(body,tries=2){let last='offline';for(let i=0;i<tries;i++){const ctl=new AbortController();const tm=setTimeout(()=>ctl.abort(),30000);try{const r=await fetch(DRIVE_URL,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify(body),redirect:'follow',signal:ctl.signal});const t=await r.text();clearTimeout(tm);try{return JSON.parse(t)}catch(e){last='server'}}catch(e){clearTimeout(tm);last=e&&e.name==='AbortError'?'timeout':'offline'}}throw{error:last}}
+async function driveCall(body,tries=4,ms=9000){let last='offline';for(let i=0;i<tries;i++){const ctl=new AbortController();const tm=setTimeout(()=>ctl.abort(),ms);try{const r=await fetch(DRIVE_URL,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify(body),redirect:'follow',signal:ctl.signal});const t=await r.text();clearTimeout(tm);let o;try{o=JSON.parse(t)}catch(e){last='server';continue}if(o&&o.error==='busy'){last='busy';await new Promise(z=>setTimeout(z,1500));continue}return o}catch(e){clearTimeout(tm);last=e&&e.name==='AbortError'?'timeout':'offline'}}throw{error:last}}
 const ACT_LS='siegelrolle-active';
 function activeId(){let a=lsGet(ACT_LS,null);if(!S.chars.find(c=>c.id===a)){a=S.chars[0]?S.chars[0].id:null;lsSet(ACT_LS,a)}return a}
 function isActive(c){return store.mode==='drive'&&c.id===activeId()}
@@ -1082,12 +1082,12 @@ function dmView(c){const o=ovOf(c);const els=o.elements||[],races=o.races||[];if
     w.append(card('研 Erforschte Elemente',el))}
   return w}
 async function saveOverlay(c,o,src){try{
-    if(src==='drive'){toast('Wird an Google Drive gesendet …');const r=await driveCall({action:'force',dm:drive.dmpw,id:c.id,value:o});if(!r.ok)throw r;store.forced=r.forced||{};await driveList()}
+    if(src==='drive'){toast('Wird an Google Drive gesendet …');const r=await driveCall({action:'force',dm:drive.dmpw,id:c.id,value:o});if(!r.ok)throw r;store.forced=r.forced||{};deliverDm();await driveList().catch(()=>{})}
     else if(src==='db'){store.forced={...(store.forced||{}),[c.id]:o};await store.db.doc('forced/all').set({chars:store.forced,updated:Date.now()})}
     else{const x=DM.chars.find(y=>y.id===c.id);if(x){x.dmo=o;dmSave()}}
     render();toast('Gespeichert'+(src==='local'?'. Exportiere die Datei für den Spieler.':'. Der Spieler bekommt es, sobald er die Siegelrolle mit diesem Charakter als aktivem Charakter offen hat.'))}catch(e){const er=e&&e.error||e&&e.code||'offline';
     if(er==='forbidden'){drive.dmpw='';lsSet(DMPW_LS,null);drive.list=null;drive.loginMsg='Das DM-Passwort stimmt nicht mehr. Melde dich neu an und gib es noch einmal.';render();toast('Nicht gespeichert: DM-Passwort stimmt nicht')}
-    else toast(er==='timeout'||er==='offline'||er==='server'?'Nicht gespeichert: Google Drive hat nicht geantwortet. Versuch es gleich noch einmal.':'Nicht gespeichert ('+er+')')}}
+    else toast(er==='timeout'||er==='offline'||er==='server'||er==='busy'?'Nicht gespeichert: Google Drive hat nicht geantwortet. Versuch es gleich noch einmal.':'Nicht gespeichert ('+er+')')}}
 function knownCustomRaces(){const byName={};const who={};const nameOf=id=>{const s=dmSources().find(x=>x.c.id===id);return s?(s.c.name||'Ohne Namen'):null};
   const add=(cid,o)=>{for(const r of (o&&o.races)||[]){const k=r.name.trim().toLowerCase();if(!byName[k]||(r.traits||[]).length>=(byName[k].traits||[]).length)byName[k]=r;const n=nameOf(cid);if(n){who[k]=who[k]||new Set();who[k].add(n)}}};
   for(const[cid,o]of Object.entries(store.forced||{}))add(cid,o);for(const c of DM.chars)add(c.id,c.dmo);
@@ -1109,7 +1109,7 @@ function dropParse(doc){const b=doc.b||[];const head=b.find(x=>/^(HEADING1|TITLE
   const rank=/Boss/i.test(sub)?(/Miniboss/i.test(sub)?'Minibosse':'Bosse'):/Fußvolk/i.test(sub)?'Fußvolk':'Sonstige';const yart=((sub.match(/\(([^)]+)\)/)||[])[1]||name).trim();const cr=(sub.match(/CR\s*(\d+)/)||[])[1];
   return{id:doc.id,name,sub,parts,total:gi?gi.s:'',special,extras,art,rank,yart,cr:cr?+cr:null}}
 async function dropsLoad(){if(dropsSt.loading)return;dropsSt.loading=true;dropsSt.err=null;render();
-  try{for(let i=0;i<6;i++){const r=await driveCall({action:'drops',dm:drive.dmpw},1);if(!r.ok)throw r;dropsSt.docs=(r.docs||[]).map(dropParse).sort((a,b)=>a.name.localeCompare(b.name,'de'));render();if(!r.more)break}}
+  try{for(let i=0;i<6;i++){const r=await driveCall({action:'drops',dm:drive.dmpw},3,40000);if(!r.ok)throw r;dropsSt.docs=(r.docs||[]).map(dropParse).sort((a,b)=>a.name.localeCompare(b.name,'de'));render();if(!r.more)break}}
   catch(e){const er=e&&e.error;dropsSt.err=er==='unknown_action'?'Dein Apps Script kennt die Drops noch nicht. Ersetze den Code durch die neue Code.gs und stelle eine neue Version bereit.':er==='no_folder'?'In deinem Google Drive gibt es keinen Ordner „Drops“.':er==='forbidden'?'Das DM-Passwort stimmt nicht mehr. Melde dich neu an.':/uthori|Berechtigung|permission/i.test(e&&e.message||'')?'Dem Apps Script fehlt die Berechtigung für Google Docs. Öffne den Apps-Script-Editor, wähle oben die Funktion „testDrops“, klick auf „Ausführen“ und erlaube den Zugriff. (Meldung: '+e.message+')':'Die Drops ließen sich nicht laden ('+(er||'offline')+(e&&e.message?': '+e.message:'')+'). Versuch es noch einmal.'}
   dropsSt.loading=false;render()}
 function dropsPane(c,o,set,src){const w=h('div');
