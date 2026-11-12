@@ -505,7 +505,7 @@ function b64enc(str){const b=new TextEncoder().encode(str);let s='';for(let i=0;
 function b64dec(b64){const s=atob(b64);const b=new Uint8Array(s.length);for(let i=0;i<s.length;i++)b[i]=s.charCodeAt(i);return new TextDecoder().decode(b)}
 const DEC_LABEL={haltung:'Haltung',schule:'Schule',bewegungen:'Bewegungen',katas:'Katas',eide:'Eide',schulen:'Erlernte Schulen',vollendet:'Vollendete Schule',fokus:'Waffenfokus',stil:'Jagdstil',griffe:'Griffe',beute:'Beute',jagdbuch:'Jagdbuch',weg:'Weg',optB:'Option B (+5 Kapazität)',talismane:'Talismane',geister:'Bekannte Geister',goetter:'Götter',kanal:'Kanalisiert',tabus:'Gebrochene Tabus',shikigami:'Shikigami',pakte:'Pakte',strophen:'Strophen',wrang:'Widerhall-Ränge',namen:'Epos · Namen',heimkehr:'Heimkehr',nprof:'Weapon Proficiencies (gewählt)',teile:'Yokai-Teile',gm:'Gegenmittel',enchTausch:'Enchanter-Tausch auf Stufe',xweap:'Weitere Waffen-Proficiencies',armor:'Armor (gewählt)'};
 function decText(v,k){if(k==='gm')return v.map(g=>g.q+'× '+g.n+(g.art?' ('+g.art+')':'')).join('; ');if(k==='teile')return v.map(x=>x.n+'× '+x.art).join('; ');if(k==='jagdbuch')return v.map(r=>r.art+' ('+(+r.besiegt||0)+' besiegt)'+(r.wissen?': '+r.wissen:'')).join('; ');if(Array.isArray(v))return v.map(x=>x&&typeof x==='object'?Object.values(x).filter(y=>y!==''&&y!=null).join(' · '):x).filter(Boolean).join('; ');return v==null?'':String(v)}
-function pdfSheet(c){const cl=C[c.classId],r=R[c.raceId],m=mods(c),pb=prof(c.level);
+function pdfSheet(c,pub){const cl=C[c.classId],r=R[c.raceId],m=mods(c),pb=prof(c.level);
   const S_='font-family:"Zen Kaku Gothic New",sans-serif;color:#1d1a17;background:#faf7f0;width:794px;padding:44px 48px;box-sizing:border-box;font-size:12.5px;line-height:1.45';
   const H=(t,kj)=>h('div',{style:'display:flex;align-items:baseline;gap:8px;border-bottom:1.5px solid #1d1a17;margin:18px 0 8px;padding-bottom:3px'},h('span',{style:'color:#b0302a;font-family:"Shippori Mincho B1",serif;font-weight:800'},kj),h('span',{style:'font-family:"Shippori Mincho B1",serif;font-weight:700;font-size:16px'},t));
   const box=(l,v,s)=>h('div',{style:'border:1px solid #cfc5b1;padding:6px 8px;text-align:center;background:#fff'},h('div',{style:'font-size:10px;letter-spacing:.08em;color:#7b7268;text-transform:uppercase'},l),h('div',{style:'font-family:"Shippori Mincho B1",serif;font-weight:800;font-size:20px'},v),s?h('div',{style:'font-size:10px;color:#7b7268'},s):null);
@@ -528,11 +528,11 @@ function pdfSheet(c){const cl=C[c.classId],r=R[c.raceId],m=mods(c),pb=prof(c.lev
   const dk=Object.keys(dv).filter(k=>DEC_LABEL[k]&&decText(dv[k])!=='');
   if(dk.length){w.append(H(cl.name+'-Entscheidungen','流'));for(const k of dk)w.append(row(DEC_LABEL[k],decText(dv[k],k)))}
   if((c.bonds||[]).length){w.append(H('Mitama · Bande','絆'));for(const x of c.bonds)w.append(row('Stufe '+x.level+' · '+(x.name||'—'),x.lehre||'—'))}
-  if((c.names||[]).some(n=>n.name)){w.append(H('Wen du kennst','縁'));for(const n of c.names)w.append(row(n.rel,(n.name||'—')+(n.wer?' · '+n.wer:'')))}
+  if(!pub&&(c.names||[]).some(n=>n.name)){w.append(H('Wen du kennst','縁'));for(const n of c.names)w.append(row(n.rel,(n.name||'—')+(n.wer?' · '+n.wer:'')))}
   w.append(H('Was du erreicht hast','歴'));for(let lv=1;lv<=c.level;lv++)if(cl.milestones[lv]&&cl.milestones[lv]!=='—')w.append(row('Stufe '+lv,cl.milestones[lv]));
   w.append(H('Inventar','持'),row('Goldstücke',String(c.gold||0)),row('Traglast',fmtW(invWeight(c))+' / '+capacity(c)+' lb.'));
   for(const it of c.inv||[])w.append(row((it.q>1?it.q+'× ':'')+it.n,[it.equipped?(it.armor?'angelegt':'bereit'):'',fmtW(itemW(it)*(it.q||1))+' lb.',it.d||''].filter(Boolean).join(' · ')));
-  if(c.notes)w.append(H('Notizen','記'),h('div',{style:'white-space:pre-wrap'},c.notes));
+  if(!pub&&c.notes)w.append(H('Notizen','記'),h('div',{style:'white-space:pre-wrap'},c.notes));
   w.append(h('p',{style:'margin-top:22px;font-size:10px;color:#7b7268'},'Exportiert aus der Siegelrolle. Diese PDF enthält die Charakterdaten und lässt sich dort wieder importieren.'));
   return w}
 async function exportPdf(c){toast('PDF wird erstellt …');
@@ -1244,7 +1244,7 @@ function drivePartyFill(box){box.textContent='';
   for(const x of drive.roster){const c=x.char;if(!c||!C[c.classId]||!R[c.raceId])continue;c.id=c.id||x.id;const cl=C[c.classId];const mine=S.chars.some(y=>y.id===c.id);
     box.append(h('div',{class:'pc'},h('span',{class:'hanko'+(cl.kanji.length>1?' v':'')},cl.kanji.slice(0,2)),h('div',{},h('b',{},(c.name||'Ohne Namen')+(mine?' (du)':'')),h('div',{},`${raceName(c)} · ${cl.name} · Stufe ${c.level}`),
       subOf(c)?h('div',{class:'who',style:'color:var(--shu)'},'進 '+subLabel(subOf(c))):null,
-      h('div',{class:'addrow',style:'margin-top:6px'},h('button',{class:'btn ghost small',type:'button',onclick:()=>modal(d=>{const sh=pdfSheet(c);sh.style.width='100%';sh.lastChild.remove();d.append(sh,h('div',{class:'foot'},h('span'),h('button',{class:'btn',type:'button',onclick:closeModal},'Schließen')))})},'Bogen ansehen')))))}
+      h('div',{class:'addrow',style:'margin-top:6px'},h('button',{class:'btn ghost small',type:'button',onclick:()=>modal(d=>{const sh=pdfSheet(c,true);sh.style.width='100%';sh.lastChild.remove();d.append(sh,h('div',{class:'foot'},h('span'),h('button',{class:'btn',type:'button',onclick:closeModal},'Schließen')))})},'Bogen ansehen')))))}
   box.append(h('div',{style:'grid-column:1/-1',class:'addrow'},h('button',{class:'btn ghost small',type:'button',onclick:()=>{drive.roster=null;render()}},'⟳ Aktualisieren')))}
 
 function abSel(k,st,draw,c){const s=h('select',{id:'asi-'+k,'aria-label':'Attribut'},h('option',{value:''},'Attribut wählen'),AB.map(a=>{const lim=score(c,a)+(st.asiMode==='one'?2:1)>20;return h('option',{value:a,disabled:lim,selected:st[k]===a},ABN[a]+' ('+score(c,a)+')')}));s.addEventListener('change',()=>{st[k]=s.value;draw()});return s}

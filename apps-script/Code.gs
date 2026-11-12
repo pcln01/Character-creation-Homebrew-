@@ -136,7 +136,13 @@ function entfernen(req) {
 }
 
 function gruppe() {
-  return { ok: true, chars: alleCharaktere(), forced: erzwungen() };
+  const chars = alleCharaktere().map(function (x) {
+    const c = JSON.parse(JSON.stringify(x.char || {}));
+    delete c.notes;
+    delete c.names;
+    return { id: x.id, char: c, updated: x.updated };
+  });
+  return { ok: true, chars: chars, forced: erzwungen() };
 }
 
 function liste(req) {
