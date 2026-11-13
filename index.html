@@ -347,7 +347,7 @@ function viewEmpty(){return h('div',{class:'empty'},
 function viewHead(c){const cl=C[c.classId],r=R[c.raceId];
   return h('div',{class:'head'},
     h('span',{class:'hanko big'+(cl.kanji.length>2?' v':'')},cl.kanji),
-    h('div',{},h('h1',{},c.name||'Ohne Namen'),h('div',{class:'meta'},`${raceName(c)}${subStage(c)} ${r.kanji} · ${cl.name} · Clan ${c.clan||'—'}`),
+    h('div',{},h('h1',{},c.name||'Ohne Namen'),h('div',{class:'meta'},`${raceName(c)}${subStage(c)} ${r.kanji} · ${cl.name} · ${clanTxt(c)}`),
       h('div',{class:'chips'},h('span',{class:'chip shu'},'Hit Die 1d'+cl.hd),subOf(c)?h('span',{class:'chip shu'},'進 '+subLabel(subOf(c))):null,c.classId==='hanyo'?h('span',{class:'chip shu'},'妖 Yokai-Grad '+hanyoGrad(c).open+(hanyoGrad(c).back?' · '+hanyoGrad(c).back+' zurück':'')):null,h('span',{class:'chip'},'Proficiency '+sgn(prof(c.level))),h('span',{class:'chip'},r.attr.replace('Attribute: ','')),h('button',{class:'btn ghost small',type:'button',id:'exportBtn',style:'margin-left:4px',onclick:()=>exportPdf(c)},'⇩ Als PDF'),h('button',{class:'btn ghost small',type:'button',id:'exportJsonBtn',onclick:()=>exportJson(c)},'⇩ Als Datei'),activeChip(c))),
     h('div',{class:'lvl'},h('div',{class:'n'},c.level),h('div',{class:'l'},'Stufe')))}
 
@@ -516,7 +516,7 @@ function pdfSheet(c,pub){const cl=C[c.classId],r=R[c.raceId],m=mods(c),pb=prof(c
   const w=h('div',{style:S_});
   w.append(h('div',{style:'display:flex;justify-content:space-between;align-items:flex-end;border-bottom:3px double #1d1a17;padding-bottom:8px'},
     h('div',{},h('div',{style:'font-size:10px;letter-spacing:.14em;color:#7b7268'},'DAS GEBROCHENE SIEGEL · SIEGELROLLE'),h('div',{style:'font-family:"Shippori Mincho B1",serif;font-weight:800;font-size:30px'},c.name||'Ohne Namen'),
-      h('div',{},`${raceName(c)}${subStage(c)} ${r.kanji} · ${cl.name} · Clan ${c.clan||'—'}`)),
+      h('div',{},`${raceName(c)}${subStage(c)} ${r.kanji} · ${cl.name} · ${clanTxt(c)}`)),
     h('div',{style:'text-align:right'},h('div',{style:'font-family:"Shippori Mincho B1",serif;font-weight:800;font-size:34px;color:#b0302a;line-height:1'},c.level),h('div',{style:'font-size:10px;letter-spacing:.1em;color:#7b7268'},'STUFE'))));
   w.append(H('Werte','値'),grid(6,...AB.map(a=>box(ABN[a],score(c,a),sgn(m[a])))));
   w.append(h('div',{style:'height:6px'}),grid(6,box('Hit Points',(c.hp??hpMax(c))+' / '+hpMax(c)),box('Soul HP',(c.soul??soulMax(c))+' / '+soulMax(c)),box('Armor Class',acOf(c)),box('Initiative',sgn(m.dex)),box('Proficiency',sgn(pb)),box('Hit Die','1d'+cl.hd)));
@@ -1090,6 +1090,8 @@ function gearValid(st){const g=GEAR[st.classId];if(!g)return true;gearInit(st);i
 function gearApply(c,st){for(const n of gearList(st)){addItem(c,ITEM[n]);const it=c.inv.find(i=>i.n===n);const cat=ITEM[n].cat;if(cat==='Waffe'||(it.armor&&it.armor.type!=='clothes'))it.equipped=true}}
 /* ---------- Spielleiter-Zusätze: Items, Klassenelemente, Rassen ---------- */
 function ovOf(c){const r=(store.forced||{})[c.id];return r||c.dmo||{}}
+function clanOf(c){const o=ovOf(c);return o.clan!==undefined?o.clan:c.clan}
+function clanTxt(c){const v=clanOf(c);return v==='keine'?'keine Clan-Angehörigkeit':'Clan '+(v||'—')}
 function subOf(c){const r=(store.forced||{})[c.id];if(r&&'sub'in r)return r.sub?r:null;if(c.dmo&&'sub'in c.dmo)return c.dmo.sub?c.dmo:null;return c.sub||null}
 const EL_TYPES={samurai:['Bewegung','Kata','Schule'],yokaihunter:['Griff','Gegenmittel'],sohei:['Bürde-Nutzung'],schreinpriester:['Talisman','Ritual'],kamikagari:['Göttliche Gabe'],onmyoji:['Formel','Shikigami'],hanyo:['Pakt-Fähigkeit'],biwahoshi:['Strophe'],ninja:['Technik']};
 const EL_ART={Bewegung:['Auftakt','Verbindung','Abschluss'],Griff:['Anschlag','Hetze','Riss']};
@@ -1178,6 +1180,7 @@ function dropsPane(c,o,set,src){const w=h('div');
   return w}
 function dmTools(c,src){const o=JSON.parse(JSON.stringify(ovOf(c)));const set=fn=>{fn(o);saveOverlay(c,o,src)};const w=h('div');
   const fc=forceControls(c,subOf(c),v=>set(o=>{if(v){o.sub=v.sub;if(v.stufe)o.stufe=v.stufe;else delete o.stufe}else{o.sub=null;delete o.stufe}}));if(fc)w.append(card('進 Unterrasse',fc));
+  const cv=clanOf(c);w.append(card('家 Clan',h('div',{class:'pick'},[['Ōtomo','Ōtomo'],['Kume','Kume'],['keine','Keine Clan-Angehörigkeit']].map(([v,l])=>h('button',{class:'pill',type:'button',id:'clan-'+v,'aria-pressed':String(cv===v),onclick:()=>set(o=>{if(v===c.clan)delete o.clan;else o.clan=v})},l))),NOTE('Gilt sofort für Bogen, PDF und Gruppenansicht. Das Inventar bleibt unverändert.')));
   const isel=h('select',{id:'giveItem','aria-label':'Item aus dem Katalog'},h('option',{value:''},'Aus dem Katalog …'),DATA.items.map(i=>h('option',{value:i.n},i.n+' ('+i.cat+')')));
   const iname=h('input',{id:'giveName',placeholder:'oder eigenes Item: Name'}),idesc=h('input',{id:'giveDesc',placeholder:'Beschreibung / Wirkung',style:'flex:1;min-width:200px'}),iw=nIn('giveW',0,0,999,64),iq=nIn('giveQ',1,1,99,56);
   isel.addEventListener('change',()=>{const cat=ITEM[isel.value];if(cat){iname.value='';iw.value=cat.w||0;idesc.placeholder=cat.d||'Beschreibung / Wirkung'}});iname.addEventListener('input',()=>{const w=catW(iname.value);if(w)iw.value=w});
