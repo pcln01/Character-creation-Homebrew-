@@ -1343,7 +1343,7 @@ function counters(c){const l=c.level,pb=prof(l),m=mods(c),d=c.dec||{};const out=
   switch(c.classId){
     case 'samurai':out.push({k:'ruhe',l:'Ruhe',max:pb+(l>=18?2:0),reset:'none',n:'Höchstens dein Proficiency Bonus'+(l>=18?' + 2':'')+'. Gewinnst du im Kampf.',empty:true,nofill:true});break;
     case 'yokaihunter':break;
-    case 'sohei':out.push({k:'buerde',l:'Bürde',max:hpMax(c)+soulMax(c)+5*((d.optB)||0),reset:'none',n:'Kapazität = max. Hit Points + max. Soul HP'+((d.optB)?' + '+5*d.optB+' (Option B)':'')+'. Steigt nur; fällt auf 0, wenn deine Hit Points auf 0 fallen.',nofill:true});
+    case 'sohei':out.push({k:'buerde',l:'Bürde',max:hpMax(c)+soulMax(c)+5*((d.optB)||0),reset:'none',n:'Kapazität = max. Hit Points + max. Soul HP'+((d.optB)?' + '+5*d.optB+' (Option B)':'')+'. Startet bei 0. Sinkt nur, wenn du sie für eine Fähigkeit ausgibst; fällt auf 0, wenn deine Hit Points auf 0 fallen.',nofill:true,empty:true});
       if(l>=7)out.push({k:'nio',l:'Niō-Gestalt (Stufen)',max:l>=20?2:1,reset:'shrine',n:'Einmal pro Schreinbesuch'+(l>=20?' (Stufe 20: zweimal)':'')+'. Solange aktiv: Armor Class 0.',nofill:true,empty:true});
       if(l>=2)out.push({k:'standhaft',l:'Standhaft',max:1,reset:'long',n:'Reaction: bei 0 Hit Points bei 1 stehen bleiben.'});break;
     case 'schreinpriester':out.push({k:'rituale',l:'Seelenrituale',max:pb,reset:'long',n:'Seelenschaden '+lvMax(l,[[1,'1d4'],[5,'1d6'],[9,'2d4'],[13,'2d6'],[17,'4d4']])+', WIS-Saving Throw gegen DC '+(8+pb+m.wis)+'.'});
