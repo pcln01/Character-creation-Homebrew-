@@ -242,6 +242,7 @@ details[open]>summary::after{content:"－"}
     <button class="btn ghost small" id="importBtn" type="button">⇪ Charakter importieren</button>
     <button class="btn ghost small" id="dmBtn" type="button">観 Sammlung (DM)</button>
     <div class="status" id="status">Lädt …</div>
+    <div class="status" id="ver"></div>
   </aside>
   <main class="scroll"><div class="inner" id="main"></div></main>
 </div>
@@ -1039,6 +1040,7 @@ function setActive(id){const old=activeId();if(old===id)return;lsSet(ACT_LS,id);
 function activeChip(c){if(store.mode!=='drive')return null;return isActive(c)?h('span',{class:'chip shu',title:'Nur dieser Charakter wird an den Spielleiter gesendet'},'● Aktiv · beim Spielleiter'):h('button',{class:'btn ghost small',type:'button',id:'setActiveBtn',onclick:()=>setActive(c.id)},'Als aktiven Charakter setzen')}
 const drive={synced:{},timer:null,busy:false,poll:null,partyPoll:null,dmpw:lsGet(DMPW_LS,''),list:null,err:null};
 function driveErr(e){return e==='forbidden'?'<span class="warn">Ein Charakter wurde auf einem anderen Gerät angelegt</span> und wird hier nicht in Drive gespeichert. Importiere ihn über eine Datei von dort.':e==='offline'?'<span class="warn">Drive nicht erreichbar.</span> Gespeichert in diesem Browser, neuer Versuch folgt.':e==='full'?'<span class="warn">Der Drive-Speicher ist voll.</span> Sag dem Spielleiter Bescheid.':'Drive-Fehler: '+e}
+try{const d=new Date(document.lastModified);if(!isNaN(d))document.getElementById('ver').textContent='Version vom '+d.toLocaleString('de-DE',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'})}catch(e){}
 function driveSave(){clearTimeout(drive.timer);drive.timer=setTimeout(driveFlush,2500);setStatus('Speichert in Drive …')}
 async function driveFlush(){if(drive.busy){driveSave();return}drive.busy=true;let err=null,changed=false;store.forced=store.forced||{};
   for(const c of S.chars.filter(c=>c.id===activeId())){const s=JSON.stringify(c);if(drive.synced[c.id]===s)continue;
