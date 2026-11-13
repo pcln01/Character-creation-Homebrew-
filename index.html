@@ -92,6 +92,7 @@ h1,h2,h3{font-family:var(--f-disp);text-wrap:balance;margin:0;font-weight:700}
 .sec h2{font-size:20px;margin-bottom:10px}
 #tip{position:fixed;z-index:9999;max-width:360px;background:var(--sumi);color:var(--paper);padding:9px 11px;border-radius:4px;font-size:13px;line-height:1.45;pointer-events:none;box-shadow:0 6px 20px rgba(0,0,0,.25);display:none}
 #tip b{display:block;margin-bottom:2px}
+.titel{display:flex;flex-wrap:wrap;gap:4px 14px;margin:-2px 0 4px;font-family:var(--f-disp);font-style:italic;color:var(--shu);font-size:15px}
 .kmod{display:grid;grid-template-columns:112px auto minmax(0,1fr);gap:10px;align-items:baseline;padding:6px 8px;border-bottom:1px solid var(--line)}.kmod:hover,.kmod:focus{background:rgba(0,0,0,.035);outline:none}.kmod .lv{font-size:12px}.kmod .kt{color:var(--sumi-3);font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 @media (max-width:600px){.kmod{grid-template-columns:auto minmax(0,1fr)}.kmod .kt{grid-column:1/-1;white-space:normal}}
 [data-tip]{cursor:help}button[data-tip]{cursor:pointer}
@@ -371,7 +372,7 @@ function viewEmpty(){return h('div',{class:'empty'},
 function viewHead(c){const cl=C[c.classId],r=R[c.raceId];
   return h('div',{class:'head'},
     h('span',{class:'hanko big'+(cl.kanji.length>2?' v':'')},cl.kanji),
-    h('div',{},h('h1',{},c.name||'Ohne Namen'),h('div',{class:'meta'},`${raceName(c)}${subStage(c)} ${r.kanji} · ${cl.name} · ${clanTxt(c)}`),
+    h('div',{},h('h1',{},c.name||'Ohne Namen'),titelOf(c).length?h('div',{class:'titel',id:'titelLine'},...titelOf(c).map(t=>h('span',{tabindex:'0','data-tip':t.text||'Vom Spielleiter verliehen.','data-tip-h':t.name},'称 '+t.name))):null,h('div',{class:'meta'},`${raceName(c)}${subStage(c)} ${r.kanji} · ${cl.name} · ${clanTxt(c)}`),
       h('div',{class:'chips'},h('span',{class:'chip shu'},'Hit Die 1d'+cl.hd),subOf(c)?h('span',{class:'chip shu'},'進 '+subLabel(subOf(c))):null,c.classId==='hanyo'?h('span',{class:'chip shu'},'妖 Yokai-Grad '+hanyoGrad(c).open+(hanyoGrad(c).back?' · '+hanyoGrad(c).back+' zurück':'')):null,h('span',{class:'chip'},'Proficiency '+sgn(prof(c.level))),h('span',{class:'chip'},r.attr.replace('Attribute: ','')),h('button',{class:'btn ghost small',type:'button',id:'exportBtn',style:'margin-left:4px',onclick:()=>exportPdf(c)},'⇩ Als PDF'),h('button',{class:'btn ghost small',type:'button',id:'exportJsonBtn',onclick:()=>exportJson(c)},'⇩ Als Datei'),activeChip(c))),
     h('div',{class:'lvl'},h('div',{class:'n'},c.level),h('div',{class:'l'},'Stufe')))}
 
@@ -550,9 +551,10 @@ function pdfSheet(c,pub){const cl=C[c.classId],r=R[c.raceId],m=mods(c),pb=prof(c
   const row=(a,b)=>h('div',{style:'display:grid;grid-template-columns:170px 1fr;gap:8px;padding:3px 0;border-bottom:1px dotted #cfc5b1'},h('b',{},a),h('span',{},b));
   const w=h('div',{style:S_});
   w.append(h('div',{style:'display:flex;justify-content:space-between;align-items:flex-end;border-bottom:3px double #1d1a17;padding-bottom:8px'},
-    h('div',{},h('div',{style:'font-size:10px;letter-spacing:.14em;color:#7b7268'},'DAS GEBROCHENE SIEGEL · SIEGELROLLE'),h('div',{style:'font-family:"Shippori Mincho B1",serif;font-weight:800;font-size:30px'},c.name||'Ohne Namen'),
+    h('div',{},h('div',{style:'font-size:10px;letter-spacing:.14em;color:#7b7268'},'DAS GEBROCHENE SIEGEL · SIEGELROLLE'),h('div',{style:'font-family:"Shippori Mincho B1",serif;font-weight:800;font-size:30px'},c.name||'Ohne Namen'),titelOf(c).length?h('div',{style:'font-family:"Shippori Mincho B1",serif;font-style:italic;color:#b0302a;font-size:14px;margin-bottom:2px'},titelOf(c).map(t=>t.name).join(' · ')):null,
       h('div',{},`${raceName(c)}${subStage(c)} ${r.kanji} · ${cl.name} · ${clanTxt(c)}`)),
     h('div',{style:'text-align:right'},h('div',{style:'font-family:"Shippori Mincho B1",serif;font-weight:800;font-size:34px;color:#b0302a;line-height:1'},c.level),h('div',{style:'font-size:10px;letter-spacing:.1em;color:#7b7268'},'STUFE'))));
+  {const tt=titelOf(c).filter(t=>t.text);if(tt.length){w.append(H('Titel','称'));for(const t of tt)w.append(row(t.name,t.text))}}
   w.append(H('Werte','値'),grid(6,...AB.map(a=>box(ABN[a],score(c,a),sgn(m[a])))));
   w.append(h('div',{style:'height:6px'}),grid(6,box('Hit Points',(c.hp??hpMax(c))+' / '+hpMax(c)),box('Soul HP',(c.soul??soulMax(c))+' / '+soulMax(c)),box('Armor Class',acOf(c)),box('Initiative',sgn(m.dex)),box('Proficiency',sgn(pb)),box('Hit Die','1d'+cl.hd)));
   if(c.corr)w.append(h('p',{style:'color:#b0302a;font-weight:700;margin:6px 0 0'},'Corruption aktiv.'));
@@ -1135,6 +1137,7 @@ const EL_TYPES={samurai:['Bewegung','Kata','Schule'],yokaihunter:['Griff','Gegen
 const EL_ART={Bewegung:['Auftakt','Verbindung','Abschluss'],Griff:['Anschlag','Hetze','Riss']};
 const SCHOOLS=['Seiten-ryū','Niten Ichi-ryū'];function schoolsOf(c){return[...new Set([...(c.dec&&c.dec.schulen||[]),...ce(c,'Schule').map(e=>e.name).filter(n=>SCHOOLS.includes(n))])]}
 function ce(c,typ){return(ovOf(c).elements||[]).filter(e=>!typ||e.typ===typ)}
+function titelOf(c){return ovOf(c).titel||[]}
 function ceText(c,name){const e=(ovOf(c).elements||[]).find(x=>x.name===name);return e?e.text:''}
 function ceArt(c,name){const e=(ovOf(c).elements||[]).find(x=>x.name===name);return e?e.art:''}
 function dmTrackers(c){const o=ovOf(c);const out=[];
@@ -1147,7 +1150,8 @@ function deliverDm(){const got=[];for(const c of S.chars){const o=ovOf(c);const 
       if(it.mat&&c.classId==='yokaihunter'){c.dec=c.dec||{};const t=(c.dec.teile=c.dec.teile||[]);const r=t.find(y=>y.art.toLowerCase()===it.mat.art.toLowerCase());if(r)r.n+=+it.mat.n||0;else t.push({art:it.mat.art,n:+it.mat.n||0});got.push((c.name||'Charakter')+': '+it.mat.n+' Yokai-Teile ('+it.mat.art+')');continue}
       const x={id:uid(),n:it.n,d:(it.d?it.d+' · ':'')+'vom Spielleiter',q:+it.q||1,w:+it.w||catW(it.n),dm:true};if(it.armor)x.armor={...it.armor};if(!ITEM[it.n])x.custom=true;c.inv.push(x);got.push((c.name||'Charakter')+': '+it.n)}}
   if(got.length){save();render();toast('Vom Spielleiter erhalten · '+got.join(', '))}}
-function dmView(c){const o=ovOf(c);const els=(o.elements||[]).filter(e=>!(e.typ==='Schule'&&SCHOOLS.includes(e.name))),races=o.races||[];if(!els.length&&!races.length)return null;const w=h('div');
+function dmView(c){const o=ovOf(c);const els=(o.elements||[]).filter(e=>!(e.typ==='Schule'&&SCHOOLS.includes(e.name))),races=o.races||[],tit=o.titel||[];if(!els.length&&!races.length&&!tit.length)return null;const w=h('div');
+  if(tit.length){const tl=h('div');for(const t of tit)tl.append(h('div',{class:'feat'},h('b',{style:'font-family:var(--f-disp);font-style:italic;color:var(--shu);font-size:16px'},'称 '+t.name),t.text?h('p',{class:'note',style:'margin:4px 0 0;white-space:pre-wrap'},t.text):null));w.append(card('称 Titel',tl))}
   for(const r of races){const tl=h('div');for(const t of (r.traits||[]).slice().sort((a,b)=>(+a.lv||1)-(+b.lv||1))){const on=(+t.lv||1)<=c.level;
       tl.append(h('div',{class:'feat',style:on?'':'opacity:.5'},h('div',{class:'addrow',style:'align-items:center;flex-wrap:wrap'},h('span',{class:'lv'},'Stufe '+(+t.lv||1)),h('b',{},t.name),+t.uses?h('span',{class:'chip'},t.uses+'× pro '+(t.reset==='short'?'Short':'Long')+' Rest'):null),on?h('p',{class:'note',style:'margin:4px 0 0;white-space:pre-wrap'},t.text||''):null))}
     w.append(card('種 '+r.name,r.text?h('p',{class:'note',style:'white-space:pre-wrap'},r.text):null,tl))}
@@ -1233,6 +1237,11 @@ function dmTools(c,src){const o=JSON.parse(JSON.stringify(ovOf(c)));const set=fn
   else w.append(card('贈 Besonderes Item geben',tabs,row(isel),row(iname,idesc),row(h('label',{class:'note',for:'giveW'},'Gewicht lb.'),iw,h('label',{class:'note',for:'giveQ'},'Anzahl'),iq,
       pbtn('Geben',()=>{const cat=ITEM[isel.value]||ITEM[Object.keys(ITEM).find(x=>x.toLowerCase()===iname.value.trim().toLowerCase())];const n=cat?cat.n:iname.value.trim();if(!n)return toast('Wähle ein Item oder gib einen Namen ein');const it={id:uid(),n,d:idesc.value.trim()||(cat?cat.d:''),w:+iw.value||(cat?+cat.w||0:0),q:Math.max(1,+iq.value||1)};if(cat&&cat.armor)it.armor={...cat.armor};set(o=>{o.items=[...(o.items||[]),it]})},{id:'giveBtn'})),
     il.childNodes.length?h('div',{style:'margin-top:8px'},h('div',{class:'label'},'Bisher gegeben'),il):null,NOTE('Das Item landet beim nächsten Abgleich im Inventar des Spielers, markiert als „vom Spielleiter“. Danach verwaltet er es selbst; aus dieser Liste nehmen holt es nicht zurück.')));
+  const tn=h('input',{id:'tiName',placeholder:'Titel, z. B. Bezwinger des Musaboru',style:'flex:1;min-width:220px'}),ttx=h('textarea',{id:'tiText',rows:'2',placeholder:'Bedeutung oder Wirkung (optional), z. B. Advantage auf Persuasion im Dorf am Berg',style:'width:100%;padding:8px;border:1px solid var(--line);border-radius:3px;background:var(--paper);color:var(--sumi);font:inherit'});
+  const til=h('div');(o.titel||[]).forEach((t,i)=>til.append(row(h('b',{style:'font-style:italic;color:var(--shu)'},'称 '+t.name),h('span',{class:'note',style:'flex:1;min-width:120px'},t.text||''),sbtn('✕',()=>set(o=>{o.titel.splice(i,1)}),{'aria-label':'Titel entfernen'}))));
+  w.append(card('称 Titel verleihen',row(tn),ttx,row(pbtn('Verleihen',()=>{if(!tn.value.trim())return toast('Titel fehlt');const t={id:uid(),name:tn.value.trim(),text:ttx.value.trim()};set(o=>{o.titel=[...(o.titel||[]),t]})},{id:'tiBtn'})),
+    til.childNodes.length?h('div',{style:'margin-top:8px'},h('div',{class:'label'},'Verliehen'),til):null,
+    NOTE('Der Titel steht beim Spieler unter dem Namen, im PDF und in der Gruppenansicht. Beim Drüberfahren sieht er die Bedeutung. Hat der Titel eine Kampfwirkung, steht er auch bei den Kampf-Modifikatoren. ✕ nimmt ihn wieder weg.')));
   const types=[...(EL_TYPES[c.classId]||[]),'Fähigkeit'];const tsel=h('select',{id:'elTyp','aria-label':'Typ'},types.map(t=>h('option',{value:t},t)));
   const asel=h('input',{id:'elArt',placeholder:'Art (z. B. Auftakt, Ka, Tier 2)',list:'elArtList'});const al=h('datalist',{id:'elArtList'},[...new Set([...Object.values(EL_ART).flat(),...ELEM])].map(x=>h('option',{value:x})));
   const en=h('input',{id:'elName',placeholder:'Name'}),et=h('textarea',{id:'elText',rows:'3',placeholder:'Was es tut',style:'width:100%;padding:8px;border:1px solid var(--line);border-radius:3px;background:var(--paper);color:var(--sumi);font:inherit'}),eu=nIn('elUses',0,0,20,56),er=h('select',{id:'elReset','aria-label':'Rast'},h('option',{value:'long'},'Long Rest'),h('option',{value:'short'},'Short Rest'));
@@ -1443,6 +1452,7 @@ function combatModsSec(c){const m=mods(c),pb=prof(c.level);const sp=saveProfs(c)
   if(c.raceId==='tengu')for(const sl of mSlots(c))if(sl.w)for(const o of masteryOf(c,sl.w))add('Weapon Mastery',sl.w+' · '+o,MDESC[o]||'');
   if(c.classId==='yokaihunter')for(const r of (c.dec.jagdbuch||[])){const b=jbBonus(c,r.art,false);if(!b.t||!r.art)continue;add('Jagdbuch',r.art+' · Tiefe '+['','I','II','III'][b.t],'+'+b.hit+' auf Attack Rolls, Advantage auf Saving Throws gegen ihre Fähigkeiten'+(b.dice?', +'+b.dice+' Schaden':'')+(b.iii?', ignorierst nichtmagische Resistenzen und Immunitäten':'')+'. Als Beute doppelt.')}
   if(c.classId==='sohei'&&c.level>=9){const bu=(c.res||{}).buerde||0;add('Klasse','Der Berg schweigt',(bu>=c.level?'Aktiv: ':'Inaktiv (Bürde '+bu+' < Stufe '+c.level+'): ')+'Resistance gegen Bludgeoning, Piercing und Slashing Damage, solange deine Bürde mindestens deiner Stufe entspricht.')}
+  for(const t of titelOf(c))if(t.text&&COMBAT_RX.test(t.text))add('Titel',t.name,t.text);
   if(c.corr)add('Zustand','Corruption','Kostet zu Beginn jedes Zuges im Kampf Soul HP.');
   const list=h('div');if(!L.length)list.append(NOTE('Keine situativen Modifikatoren.'));
   for(const[src,n,t]of L)list.append(h('div',{class:'kmod','data-tip':t,'data-tip-h':n,tabindex:'0'},h('span',{class:'lv'},src),h('b',{},n),h('span',{class:'kt'},t)));
