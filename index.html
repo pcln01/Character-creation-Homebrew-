@@ -90,6 +90,11 @@ h1,h2,h3{font-family:var(--f-disp);text-wrap:balance;margin:0;font-weight:700}
 .sec{display:grid;grid-template-columns:34px minmax(0,1fr);gap:14px;margin-bottom:28px}
 .sec>.vt{writing-mode:vertical-rl;font-family:var(--f-disp);font-weight:800;font-size:20px;color:var(--shu);letter-spacing:.2em;border-right:1px solid var(--shu);padding-right:8px;justify-self:end}
 .sec h2{font-size:20px;margin-bottom:10px}
+#tip{position:fixed;z-index:9999;max-width:360px;background:var(--sumi);color:var(--paper);padding:9px 11px;border-radius:4px;font-size:13px;line-height:1.45;pointer-events:none;box-shadow:0 6px 20px rgba(0,0,0,.25);display:none}
+#tip b{display:block;margin-bottom:2px}
+.kmod{display:grid;grid-template-columns:112px auto minmax(0,1fr);gap:10px;align-items:baseline;padding:6px 8px;border-bottom:1px solid var(--line)}.kmod:hover,.kmod:focus{background:rgba(0,0,0,.035);outline:none}.kmod .lv{font-size:12px}.kmod .kt{color:var(--sumi-3);font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+@media (max-width:600px){.kmod{grid-template-columns:auto minmax(0,1fr)}.kmod .kt{grid-column:1/-1;white-space:normal}}
+[data-tip]{cursor:help}button[data-tip]{cursor:pointer}
 .jb{display:grid;grid-template-columns:minmax(0,1fr) 210px;gap:22px;align-items:start}
 .jbtoc{position:sticky;top:12px;border:1px solid var(--line);border-radius:var(--r);padding:12px;background:var(--paper)}
 .jbtoc ol{list-style:none;margin:6px 0 10px;padding:0;display:grid;gap:2px}
@@ -453,7 +458,17 @@ function openLevelUp(c){const cl=C[c.classId];const next=c.level+1;const LC=lvCh
         if(bondLv){L.bond=true;c.bonds=[...(c.bonds||[]),{level:next,name:st.bondName,lehre:st.lehre}]}
         const before=hpMax(c),sb=soulMax(c);c.levels=[...(c.levels||[]),L];c.level=next;c.hp=Math.max(0,(c.hp??before)+(hpMax(c)-before));c.soul=Math.max(0,(c.soul??sb)+(soulMax(c)-sb));});
       closeModal();toast('Stufe '+next+' erreicht')}},'Aufsteigen')))};draw()})}
-function lvPill(lab,on,fn,dis){return h('button',{class:'pill',type:'button','aria-pressed':String(on),disabled:!!dis,onclick:fn},lab)}
+function ruleTip(c,name){const cl=c&&C[c.classId];if(!cl||!name)return'';const n=name.toLowerCase();const cellsOf=ln=>ln.split('|').slice(1,-1).map(x=>x.replace(/\*\*/g,'').trim());
+  for(const r of cl.rules||[]){const B=r.body||[];for(let k=0;k<B.length;k++){if(!/^\|/.test(B[k]))continue;const hd=cellsOf(B[k]);const j=hd.findIndex((x,ix)=>ix>0&&x.toLowerCase().startsWith(n));if(j<1||hd[0])continue;const out=[];for(let q=k+1;q<B.length&&/^\|/.test(B[q]);q++){const cc=cellsOf(B[q]);if(cc[0]&&cc[j])out.push(cc[0]+': '+cc[j])}if(out.length)return out.join(' · ')}}
+  for(const r of cl.rules||[])for(const ln of r.body||[]){if(!/^\|/.test(ln))continue;const cells=ln.split('|').slice(1,-1).map(x=>x.replace(/\*\*/g,'').trim());const i=cells.findIndex(x=>{const y=x.toLowerCase();return y===n||y.startsWith(n+' ')||y.startsWith(n+' —')});if(i<0||i===cells.length-1)continue;const rest=cells.slice(i+1).filter(x=>x&&x!=='—');if(rest.length)return rest.join(' · ')}return''}
+function tipFor(name,c){c=c||cur();if(!name)return'';return (ITEM[name]&&ITEM[name].d)||DATA.moveText[name]||DATA.griffText[name]||(DATA.strophenText||{})[name]||(DATA.opferText||{})[name]||(DATA.talisText||{})[name]||(c&&ceText(c,name))||ruleTip(c,name)||basicsTip(c,name)||''}
+function basicsTip(c,name){const cl=c&&C[c.classId];if(!cl)return'';const e=Object.entries(cl.basics||{}).find(([k,v])=>typeof v==='string'&&new RegExp('\\b'+name.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')+'\\b').test(v));return e?e[0]+': '+e[1]:''}
+(function(){let el=null;const show=(t,x)=>{if(!el){el=document.createElement('div');el.id='tip';el.setAttribute('role','tooltip');document.body.appendChild(el)}const tt=t.getAttribute('data-tip');if(!tt)return;el.innerHTML='';const hd=t.getAttribute('data-tip-h');if(hd){const b=document.createElement('b');b.textContent=hd;el.appendChild(b)}el.appendChild(document.createTextNode(tt));el.style.display='block';const r=t.getBoundingClientRect(),w=el.offsetWidth,hh=el.offsetHeight;let left=Math.min(window.innerWidth-w-8,Math.max(8,r.left));let top=r.bottom+6;if(top+hh>window.innerHeight-8)top=Math.max(8,r.top-hh-6);el.style.left=left+'px';el.style.top=top+'px'};
+  const hide=()=>{if(el)el.style.display='none'};
+  document.addEventListener('mouseover',e=>{const t=e.target.closest&&e.target.closest('[data-tip]');if(t)show(t);else hide()});
+  document.addEventListener('focusin',e=>{const t=e.target.closest&&e.target.closest('[data-tip]');if(t)show(t);else hide()});
+  document.addEventListener('focusout',hide);window.addEventListener('scroll',hide,true);document.addEventListener('click',hide)})();
+function lvPill(lab,on,fn,dis){const t=tipFor(lab);return h('button',{class:'pill',type:'button','aria-pressed':String(on),disabled:!!dis,onclick:fn,'data-tip':t||null,'data-tip-h':t?lab:null},lab)}
 function lvBox(title,note,...kids){return h('div',{style:'margin-top:18px'},h('h3',{style:'font-size:18px'},title),note?h('p',{class:'note'},note):'',...kids)}
 function lvRow(label,opts,st,draw,key){key=key||'pick';const pk=h('div',{class:'pick',style:'margin-bottom:6px'});if(label)pk.append(h('span',{style:'font-size:12px;font-weight:700;color:var(--sumi-3);min-width:84px;align-self:center'},label));
   for(const o of opts){const v=typeof o==='string'?o:o.v,l=typeof o==='string'?o:o.l;pk.append(lvPill(l,st.cd[key]===v,()=>{st.cd[key]=st.cd[key]===v?null:v;draw()}))}return pk}
@@ -1412,6 +1427,28 @@ function attacks(c){const m=mods(c),pb=prof(c.level);const out=[];
 function roll(expr){let tot=0;const parts=[];for(const t of expr.replace(/\s/g,'').split('+')){const m=t.match(/^(\d*)d(\d+)$/);if(m){const n=+m[1]||1;for(let i=0;i<n;i++){const r=1+Math.floor(Math.random()*+m[2]);parts.push(r);tot+=r}}else if(t){tot+=+t;parts.push(+t)}}return{tot,parts}}
 function rollToast(label,expr,bonus){const r=roll(expr);const t=r.tot+(bonus||0);toast(`${label}: ${t}  (${r.parts.join(' + ')}${bonus?(bonus>0?' + ':' − ')+Math.abs(bonus):''})`)}
 
+
+const COMBAT_RX=/Attack Roll|Damage|Schaden|Armor Class|Saving Throw|Advantage|Disadvantage|Resistance|Immun|Initiative|Hit Points|Speed|Reaction|Bonus Action|frightened|prone|grappled|Angriff|Treffer/i;
+function saveProfs(c){const t=(C[c.classId].basics||{})['Saving Throws']||'';return AB.filter(a=>new RegExp('\\b'+ABN[a]+'\\b').test(t))}
+function combatModsSec(c){const m=mods(c),pb=prof(c.level);const sp=saveProfs(c);
+  const sv=h('div',{class:'vitals',style:'grid-template-columns:repeat(6,minmax(0,1fr))'},...AB.map(a=>{const v=m[a]+(sp.includes(a)?pb:0);return h('div',{class:'vital',style:'padding:8px'},h('div',{class:'label'},ABN[a]+(sp.includes(a)?' ●':'')),h('button',{class:'btn ghost small',type:'button','aria-label':ABN[a]+' Saving Throw würfeln',onclick:()=>rollToast(ABN[a]+' Saving Throw','1d20',v)},sgn(v)))}));
+  const pp=passivePerc(c);
+  const L=[];const add=(src,name,t)=>L.push([src,name,t]);
+  if(initBonus(c))add('Rasse','Der Zähler der Monde','+'+initBonus(c)+' auf Initiative.');
+  if(c.raceId==='iwanosei')add('Rasse','Iwa-no-sei','Disadvantage auf Initiative.');
+  if(outcastBonus(c))add('Rasse','Der Verstoßene','+'+outcastBonus(c)+' (Mondphase).');
+  for(const[sk,t]of Object.entries(skillTags(c)))add('Skill',sk,t);
+  const R0=R[c.raceId];for(const[lv,arr]of Object.entries(R0.levels||{})){if(+lv>c.level)continue;for(const e of arr){const t=e.t||'';if(!COMBAT_RX.test(t))continue;const k=t.indexOf('. ');add('Rasse St. '+lv,k>0&&k<60?t.slice(0,k):R0.name,k>0&&k<60?t.slice(k+2):t)}}
+  for(const n of lehren(c)){const t=lehreText(n);if(COMBAT_RX.test(t))add('Mitama',n,t)}
+  if(c.raceId==='tengu')for(const sl of mSlots(c))if(sl.w)for(const o of masteryOf(c,sl.w))add('Weapon Mastery',sl.w+' · '+o,MDESC[o]||'');
+  if(c.classId==='yokaihunter')for(const r of (c.dec.jagdbuch||[])){const b=jbBonus(c,r.art,false);if(!b.t||!r.art)continue;add('Jagdbuch',r.art+' · Tiefe '+['','I','II','III'][b.t],'+'+b.hit+' auf Attack Rolls, Advantage auf Saving Throws gegen ihre Fähigkeiten'+(b.dice?', +'+b.dice+' Schaden':'')+(b.iii?', ignorierst nichtmagische Resistenzen und Immunitäten':'')+'. Als Beute doppelt.')}
+  if(c.classId==='sohei'&&c.level>=9){const bu=(c.res||{}).buerde||0;add('Klasse','Der Berg schweigt',(bu>=c.level?'Aktiv: ':'Inaktiv (Bürde '+bu+' < Stufe '+c.level+'): ')+'Resistance gegen Bludgeoning, Piercing und Slashing Damage, solange deine Bürde mindestens deiner Stufe entspricht.')}
+  if(c.corr)add('Zustand','Corruption','Kostet zu Beginn jedes Zuges im Kampf Soul HP.');
+  const list=h('div');if(!L.length)list.append(NOTE('Keine situativen Modifikatoren.'));
+  for(const[src,n,t]of L)list.append(h('div',{class:'kmod','data-tip':t,'data-tip-h':n,tabindex:'0'},h('span',{class:'lv'},src),h('b',{},n),h('span',{class:'kt'},t)));
+  return foldSec('kmods','修','Kampf-Modifikatoren',h('div',{class:'label',style:'margin-bottom:6px'},'Saving Throws · ● = proficient (+'+pb+')'),sv,
+    h('div',{class:'addrow',style:'margin:10px 0;flex-wrap:wrap;gap:8px'},h('span',{class:'chip'},'Armor Class '+acOf(c)),h('span',{class:'chip'},'Initiative '+sgn(m.dex+initBonus(c))),h('span',{class:'chip'},'Passive Perception '+pp.v),h('span',{class:'chip'},'Proficiency '+sgn(pb)),DCAB[c.classId]?h('span',{class:'chip'},'Saving Throw DC '+(8+pb+m[DCAB[c.classId]])):null),
+    h('div',{class:'label',style:'margin:8px 0 6px'},'Situativ · aus Rasse, Klasse, Mitama und Ausrüstung'),list)}
 function viewCombat(c){R_(c);const m=mods(c),pb=prof(c.level),cl=C[c.classId];const w=h('div');
   /* rests */
   const hdLeft=c.level-(c.hdUsed||0);
@@ -1429,6 +1466,7 @@ function viewCombat(c){R_(c);const m=mods(c),pb=prof(c.level),cl=C[c.classId];co
   const ini=h('div',{class:'vital'},h('div',{class:'label'},'Initiative'),h('div',{class:'big'},sgn(m.dex+initBonus(c))),h('div',{class:'row'},h('button',{class:'btn ghost small',type:'button',onclick:()=>rollToast('Initiative','1d20',m.dex+initBonus(c))},'🎲 würfeln')),initBonus(c)?h('p',{class:'note'},'inkl. +'+initBonus(c)+' Der Zähler der Monde'):null,c.raceId==='iwanosei'?h('p',{class:'note'},'Iwa-no-sei: Disadvantage auf Initiative.'):null);
   const dcab=DCAB[c.classId];const dc=dcab?h('div',{class:'vital'},h('div',{class:'label'},'Saving Throw DC'),h('div',{class:'big'},8+pb+m[dcab]),h('p',{class:'note'},'Klasse: 8 + Proficiency + '+ABN[dcab]),c.raceId==='kitsune'&&dcab!=='cha'?h('p',{class:'note',style:'margin-top:4px'},h('b',{},'Kitsune-Zauber: DC '+(8+pb+m.cha)+' · Angriff '+sgn(pb+m.cha)),' (CHA)'):null):h('div',{class:'vital'},h('div',{class:'label'},'Proficiency'),h('div',{class:'big'},sgn(pb)),c.raceId==='kitsune'?h('p',{class:'note',style:'margin-top:4px'},h('b',{},'Kitsune-Zauber: DC '+(8+pb+m.cha)+' · Angriff '+sgn(pb+m.cha)),' (CHA)'):null);
   w.append(sec('戦','Kampfwerte',h('div',{class:'vitals'},vital('Hit Points',c.hp??hpMax(c),hpMax(c),'hp',''),vital('Soul HP',c.soul??soulMax(c),soulMax(c),'soul','ai'),ini,dc),h('div',{class:'vitals',style:'margin-top:10px;grid-template-columns:minmax(0,1fr) minmax(0,3fr)'},h('div',{class:'vital'},h('div',{class:'label'},'Armor Class'),h('div',{class:'big'},acOf(c))),cbox)));
+  w.append(combatModsSec(c));
   /* attacks */
   const at=attacks(c);const tb=h('table');tb.append(h('tr',{},h('th',{},'Angriff'),h('th',{},'Treffer'),h('th',{},'Schaden'),h('th',{},'')));
   for(const a of at){const dmgExpr=a.dmg==='1'?'1':a.dmg;tb.append(h('tr',{},h('td',{},h('b',{},a.n),mChips(c,a.n),h('div',{class:'note'},(a.p?'':'⚠ keine Proficiency · ')+ABN[a.ab]+(a.note?' · '+a.note:''))),
@@ -1476,12 +1514,12 @@ function openShrine(c){modal(d=>{const kk=c.classId==='kamikagari';
 
 /* ---------- class decisions ---------- */
 function decSet(k,v){upd(c=>{R_(c);c.dec[k]=v})}
-function choiceRow(c,k,label,opts,note){const v=(c.dec||{})[k];return h('div',{style:'margin-bottom:16px'},h('div',{class:'label',style:'margin-bottom:6px'},label),h('div',{class:'pick'},opts.map(o=>h('button',{class:'pill',type:'button','aria-pressed':String(v===o),onclick:()=>decSet(k,v===o?null:o)},o))),note?h('p',{class:'note'},note):null)}
+function choiceRow(c,k,label,opts,note){const v=(c.dec||{})[k];return h('div',{style:'margin-bottom:16px'},h('div',{class:'label',style:'margin-bottom:6px'},label),h('div',{class:'pick'},opts.map(o=>{const tp=tipFor(o,c);return h('button',{class:'pill',type:'button','aria-pressed':String(v===o),'data-tip':tp||null,'data-tip-h':tp?o:null,onclick:()=>decSet(k,v===o?null:o)},o)})),note?h('p',{class:'note'},note):null)}
 function textRow(c,k,label,ph){const i=h('input',{id:'dec-'+k,value:(c.dec||{})[k]||'',placeholder:ph||'',style:'width:100%;max-width:420px;padding:8px 10px;border:1px solid var(--line);border-radius:3px;background:var(--paper)'});i.addEventListener('change',()=>decSet(k,i.value));return h('div',{class:'field',style:'margin-bottom:16px'},h('label',{for:'dec-'+k},label),i)}
 function pickRow(c,k,label,opts,limit,note){const sel=(c.dec||{})[k]||[];const custom=sel.filter(s=>!opts.some(o=>o.n===s));
   const wrap=h('div',{style:'margin-bottom:18px'},h('div',{class:'label',style:'margin-bottom:6px'},`${label} · ${sel.length} von ${limit}`));
-  const pk=h('div',{class:'pick'});for(const o of opts){const on=sel.includes(o.n);pk.append(h('button',{class:'pill',type:'button','aria-pressed':String(on),title:o.t||'',disabled:(!on&&(sel.length>=limit||(o.min&&o.min>c.level))),onclick:()=>decSet(k,on?sel.filter(x=>x!==o.n):[...sel,o.n])},(o.g?o.g+': ':'')+o.n+(o.min&&o.min>c.level?' (St. '+o.min+')':'')))}
-  for(const s of custom)pk.append(h('button',{class:'pill',type:'button','aria-pressed':'true',onclick:()=>decSet(k,sel.filter(x=>x!==s))},'✎ '+s+' ✕'));
+  const pk=h('div',{class:'pick'});for(const o of opts){const on=sel.includes(o.n);const tp=o.t||tipFor(o.n,c);pk.append(h('button',{class:'pill',type:'button','aria-pressed':String(on),'data-tip':tp||null,'data-tip-h':tp?o.n:null,disabled:(!on&&(sel.length>=limit||(o.min&&o.min>c.level))),onclick:()=>decSet(k,on?sel.filter(x=>x!==o.n):[...sel,o.n])},(o.g?o.g+': ':'')+o.n+(o.min&&o.min>c.level?' (St. '+o.min+')':'')))}
+  for(const s of custom)pk.append(h('button',{class:'pill',type:'button','aria-pressed':'true','data-tip':ceText(c,s)||'Eigene, mit dem DM erforscht.','data-tip-h':s,onclick:()=>decSet(k,sel.filter(x=>x!==s))},'✎ '+s+' ✕'));
   wrap.append(pk);const ci=h('input',{placeholder:'Eigene hinzufügen …','aria-label':label+' eigene',style:'margin-top:6px;padding:6px 10px;border:1px solid var(--line);border-radius:3px;background:var(--paper)'});ci.addEventListener('change',()=>{if(ci.value.trim()&&sel.length<limit)decSet(k,[...sel,ci.value.trim()])});wrap.append(ci);
   if(note)wrap.append(h('p',{class:'note'},note));return wrap}
 function listRow(c,k,label,fields,limit,note){const rows=(c.dec||{})[k]||[];const wrap=h('div',{style:'margin-bottom:18px'},h('div',{class:'label',style:'margin-bottom:6px'},label+(limit!=null?` · ${rows.length} von ${limit}`:` · ${rows.length}`)));
@@ -1593,7 +1631,7 @@ function viewClass(c){R_(c);const l=c.level,m=mods(c),d=c.dec,w=h('div');const c
       box.append(h('p',{class:'note'},`Zusätzliche Reactions pro Runde: ${lvMax(l,[[1,0],[11,1],[17,2]])}.`));break}
   }
   w.append(sec(C[c.classId].kanji.slice(0,1),'Deine '+C[c.classId].name+'-Entscheidungen',box));
-  const xw=c.dec.xweap||[];w.append(sec('添','Weitere Waffen-Proficiencies',h('p',{class:'note'},'Zum Beispiel aus einer Lehre. Waffen, für die du Weapon Mastery hast (Tengu), zählen automatisch als proficient.'),h('div',{class:'pick'},DATA.items.filter(i=>i.cat==='Waffe').map(i=>{const on=xw.includes(i.n);return h('button',{class:'pill',type:'button','aria-pressed':String(on),onclick:()=>decSet('xweap',on?xw.filter(x=>x!==i.n):[...xw,i.n])},i.n)}))));
+  const xw=c.dec.xweap||[];w.append(sec('添','Weitere Waffen-Proficiencies',h('p',{class:'note'},'Zum Beispiel aus einer Lehre. Waffen, für die du Weapon Mastery hast (Tengu), zählen automatisch als proficient.'),h('div',{class:'pick'},DATA.items.filter(i=>i.cat==='Waffe').map(i=>{const on=xw.includes(i.n);return h('button',{class:'pill',type:'button','aria-pressed':String(on),'data-tip':i.d||null,'data-tip-h':i.n,onclick:()=>decSet('xweap',on?xw.filter(x=>x!==i.n):[...xw,i.n])},i.n)}))));
   return w}
 
 function armorOpts(cid){const t=(C[cid].basics['Armor Proficiencies']||'').split('(')[0].split(',')[0];if(!/ oder /.test(t))return null;return t.split(' oder ').map(s=>s.trim()).map(s=>s[0].toUpperCase()+s.slice(1))}
