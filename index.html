@@ -90,6 +90,16 @@ h1,h2,h3{font-family:var(--f-disp);text-wrap:balance;margin:0;font-weight:700}
 .sec{display:grid;grid-template-columns:34px minmax(0,1fr);gap:14px;margin-bottom:28px}
 .sec>.vt{writing-mode:vertical-rl;font-family:var(--f-disp);font-weight:800;font-size:20px;color:var(--shu);letter-spacing:.2em;border-right:1px solid var(--shu);padding-right:8px;justify-self:end}
 .sec h2{font-size:20px;margin-bottom:10px}
+.jb{display:grid;grid-template-columns:minmax(0,1fr) 210px;gap:22px;align-items:start}
+.jbtoc{position:sticky;top:12px;border:1px solid var(--line);border-radius:var(--r);padding:12px;background:var(--paper)}
+.jbtoc ol{list-style:none;margin:6px 0 10px;padding:0;display:grid;gap:2px}
+.jbtoc button.ti{display:flex;justify-content:space-between;gap:8px;width:100%;text-align:left;background:none;border:0;border-left:2px solid transparent;padding:5px 8px;font:inherit;color:inherit;cursor:pointer}
+.jbtoc button.ti[aria-current=page]{border-left-color:var(--shu);color:var(--shu);font-weight:700;background:var(--paper-2,rgba(0,0,0,.03))}
+.jbtoc .pg{color:var(--sumi-3);font-size:12px;font-variant-numeric:tabular-nums}
+.jbpage{border:1px solid var(--line);border-radius:var(--r);padding:22px 24px 16px;background:var(--paper);min-height:360px;display:flex;flex-direction:column}
+.jbpage .ft{margin-top:auto;padding-top:14px;display:flex;justify-content:space-between;align-items:center;gap:8px;border-top:1px solid var(--line);font-size:12px;color:var(--sumi-3)}
+.jbpage input.ttl{font-family:var(--f-disp);font-size:26px;font-weight:800;border:0;border-bottom:1px solid var(--line);background:none;color:var(--sumi);width:100%;padding:2px 0 6px}
+@media (max-width:760px){.jb{grid-template-columns:minmax(0,1fr)}.jbtoc{position:static;order:-1}}
 .foldb{display:flex;align-items:baseline;gap:10px;width:100%;background:none;border:0;padding:0;margin:0 0 10px;font:inherit;color:inherit;cursor:pointer;text-align:left}.foldb h2{margin:0}.foldb .chev{color:var(--shu);font-size:14px}.foldb[aria-expanded=false]{margin-bottom:0}
 .label{font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--sumi-3);font-weight:700}
 /* abilities */
@@ -1498,7 +1508,33 @@ function viewMitama(c){const w=h('div');const sd=mitamaSide(c);const bonds=c.bon
   w.append(sec('絆','Bande und Lehren',bl));
   if(own.includes('Trauer'))w.append(sec('喪','Trauer',h('p',{},DATA.mitama.trauer),NOTE('Gilt unabhängig von deiner Waage. Sag dem Spielleiter Bescheid: Der Tod eines Bandes verschiebt die Waage um 1 nach Nigimitama.')));
   return w}
-function viewBook(c){return h('div',{},sec('冊','Jagdbuch',jagdbuchDoc(c,false)))}
+let jbDel=null;
+function viewBook(c){R_(c);const rows=c.dec.jagdbuch||[];let pg=S.jbPage;if(pg!=='start'&&!(pg>=0&&pg<rows.length))pg='start';
+  const go=x=>{S.jbPage=x;jbDel=null;render();const m=document.querySelector('.jbpage');if(m&&m.getBoundingClientRect().top<0)m.scrollIntoView({block:'start'})};
+  const tier=r=>['—','I','II','III'][tiefeOf(c,r.besiegt)];
+  const order=rows.map((r,i)=>i).sort((a,b)=>(rows[a].art||'').localeCompare(rows[b].art||'','de'));
+  const toc=h('nav',{class:'jbtoc','aria-label':'Inhaltsverzeichnis'},h('div',{class:'label'},'Inhalt'),
+    h('ol',{},h('li',{},h('button',{class:'ti',type:'button','aria-current':pg==='start'?'page':null,onclick:()=>go('start')},h('span',{},'Einband · Tiefen'),h('span',{class:'pg'},'1'))),
+      ...order.map((i,k)=>h('li',{},h('button',{class:'ti',type:'button',id:'jbToc-'+i,'aria-current':pg===i?'page':null,onclick:()=>go(i)},h('span',{},rows[i].art||'Ohne Namen'),h('span',{class:'pg'},tier(rows[i])+' · '+(k+2)))))),
+    pbtn('＋ Neue Seite',()=>{const n=rows.length;upd(c=>{R_(c);c.dec.jagdbuch=[...(c.dec.jagdbuch||[]),{art:'',besiegt:0,wissen:''}]});go(n);setTimeout(()=>{const x=document.getElementById('jb-art-'+n);if(x)x.focus()},0)},{id:'jbAdd',style:'width:100%'}));
+  const pos=pg==='start'?0:order.indexOf(pg)+1;const seq=['start',...order];
+  const nav=h('div',{class:'ft'},pos>0?sbtn('← '+(seq[pos-1]==='start'?'Einband':(rows[seq[pos-1]].art||'Ohne Namen')),()=>go(seq[pos-1])):h('span'),h('span',{},'Seite '+(pos+1)+' von '+seq.length),pos<seq.length-1?sbtn((rows[seq[pos+1]].art||'Ohne Namen')+' →',()=>go(seq[pos+1])):h('span'));
+  let page;
+  if(pg==='start'){const tbl=h('table');tbl.append(h('tr',{},h('th',{},'Tiefe'),h('th',{},'Besiegt'),h('th',{},'Ab Stufe'),h('th',{},'Was du gegen diese Art gewinnst')));
+    for(const t of DATA.tiefen)tbl.append(h('tr',{style:c.level>=t.lv?'':'opacity:.55'},h('td',{},h('b',{},t.n)),h('td',{},t.besiegt),h('td',{},t.lv),h('td',{},t.t)));
+    page=h('article',{class:'jbpage'},h('div',{class:'label'},'冊 Jagdbuch'+(c.dec.stil?' · '+c.dec.stil:'')),h('h2',{style:'margin:4px 0 12px'},'Das Jagdbuch von '+(c.name||'Ohne Namen')),
+      h('div',{class:'tblw',style:'margin-bottom:12px'},tbl),NOTE('Gegen deine markierte Beute wirken alle Boni doppelt. Beides muss erfüllt sein: genug Siege UND die Stufe.'+(c.level>=20?' Der Blick des Jägers: Alle Einträge stehen auf Tiefe III.':'')),
+      rows.length?NOTE(rows.length+(rows.length===1?' Art eingetragen. ':' Arten eingetragen. ')+'Wähle rechts eine Seite.'):NOTE('Dein Jagdbuch ist noch leer. Eintragen: 10 Minuten am Kadaver, eine Stunde Recherche oder eine überlebte, gründlich beobachtete Begegnung. Leg rechts mit „Neue Seite“ die erste Art an.'),nav)}
+  else{const i=pg,r=rows[i];const t=tiefeOf(c,r.besiegt);const b=jbBonus(c,r.art,false);
+    const art=h('input',{class:'ttl',id:'jb-art-'+i,value:r.art||'',placeholder:'Art, z. B. Oni','aria-label':'Art'});art.addEventListener('change',()=>upd(c=>{c.dec.jagdbuch[i].art=art.value.trim()}));
+    const kill=nIn('jb-n-'+i,+r.besiegt||0,0,99,64);kill.addEventListener('change',()=>upd(c=>{c.dec.jagdbuch[i].besiegt=Math.max(0,+kill.value||0)}));
+    const note=h('textarea',{id:'jb-note-'+i,rows:'14',placeholder:'Was du über diese Art weißt: Hit Points, Immunitäten, Verwundbarkeiten, Verhalten, Begegnungen …','aria-label':'Wissen',style:'width:100%;padding:10px 12px;border:1px solid var(--line);border-radius:3px;background:var(--paper);color:var(--sumi);font:inherit;line-height:1.5;resize:vertical'});note.value=r.wissen||'';note.addEventListener('change',()=>upd(c=>{c.dec.jagdbuch[i].wissen=note.value}));
+    const del=jbDel===i?h('span',{class:'addrow',style:'align-items:center'},h('span',{class:'note'},'Seite wirklich löschen?'),sbtn('Ja, löschen',()=>{upd(c=>{c.dec.jagdbuch.splice(i,1)});S.jbPage='start';jbDel=null;render()},{id:'jbDelOk'}),sbtn('Nein',()=>{jbDel=null;render()})):sbtn('Seite löschen',()=>{jbDel=i;render()},{id:'jbDel'});
+    page=h('article',{class:'jbpage'},h('div',{class:'label'},'冊 Jagdbuch · Art'),art,
+      h('div',{class:'addrow',style:'align-items:center;flex-wrap:wrap;margin:10px 0'},h('label',{class:'note',for:'jb-n-'+i},'Besiegt'),kill,h('span',{class:'chip shu'},['— noch keine Tiefe','I Gesehen','II Verstanden','III Gemeistert'][t])),
+      t?h('p',{class:'note',style:'margin:0 0 10px'},'Gegen diese Art: +'+b.hit+' auf Attack Rolls, Advantage auf Saving Throws gegen ihre Fähigkeiten'+(b.dice?', +'+b.dice+' Schaden, du kennst Hit Points, Immunitäten und Verwundbarkeiten':'')+(b.iii?', ignorierst nichtmagische Resistenzen und Immunitäten, 1× pro Kampf einen Angriff oder Effekt zunichtemachen (Reaction). Mal eingebrannt.':'.')+' Als Beute doppelt.'):NOTE('Noch keine Tiefe: Du brauchst einen Sieg über diese Art.'),
+      h('div',{class:'label',style:'margin:6px 0 4px'},'Wissen'),note,h('div',{style:'margin-top:10px'},del),nav)}
+  return h('div',{},h('div',{class:'jb'},page,toc))}
 function viewLinks(c){R_(c);const l=c.level,d=c.dec;const maxR=lvMax(l,[[1,1],[4,2],[6,3],[8,4],[10,5],[12,6],[14,7],[16,8],[18,9],[20,10]]);const maxG=lvMax(l,[[1,1],[5,2],[10,3],[15,4],[20,5]]);const rows=d.goetter||[];
   const w=h('div');w.append(sec('絆','Götter und Social Links',listRow(c,'goetter','Götter',[{k:'gott',l:'Gott',opts:GODS.filter(([s])=>s<=l).map(([s,n])=>n)},{k:'rang',l:'Social Link',num:true,min:1,max:maxR}],maxG,`Neue Götter auf den Stufen 1, 5, 10, 15 und 20. Höchster Rang auf deiner Stufe: ${maxR}. Steigern nur am Schrein, höchstens 2 Ränge pro Aufenthalt.`)));
   const owned=rows.filter(g=>g.gott&&DATA.gods[g.gott]);
