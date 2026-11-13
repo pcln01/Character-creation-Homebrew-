@@ -170,6 +170,7 @@ details[open]>summary::after{content:"－"}
 .grp::after{content:"";flex:1;height:1px;background:var(--line)}
 .preview{margin-top:16px;border-top:1px solid var(--line);padding-top:14px}
 .fields{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:14px}
+.fields.bottom{align-items:end}
 .field{display:flex;flex-direction:column;gap:4px}
 .field label{font-size:12px;font-weight:700;color:var(--sumi-2)}
 .abin{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:8px}
@@ -359,6 +360,7 @@ function viewSheet(c){const cl=C[c.classId];const m=mods(c);const pb=prof(c.leve
     vital('Soul HP',c.soul,smax,'soul','ai'),
     h('div',{class:'vital'},h('div',{class:'label'},'Armor Class'),h('div',{class:'big'},acOf(c)),h('div',{class:'note'},'aus angelegter Rüstung')),
     h('div',{class:'vital'},h('div',{class:'label'},'Initiative'),h('div',{class:'big'},sgn(m.dex+initBonus(c))),h('div',{class:'note'},(initBonus(c)?'inkl. +'+initBonus(c)+' Zähler der Monde · ':'')+'Speed: '+(r=>{const x=r.attr.match(/(\d+) ft\./);return x?x[1]+' ft.':'—'})(R[c.raceId]))));
+  {const pp=passivePerc(c);vit.append(h('div',{class:'vital'},h('div',{class:'label'},'Passive Perception'),h('div',{class:'big'},pp.v),h('div',{class:'note'},pp.note)))}
   w.append(sec('命','Lebenskraft',vit,h('p',{class:'note'},'Soul HP = 2 + Stufe + Summe aller sechs Ability Modifier, mindestens 1.'+(c.raceId==='mensch'?' Zäh: +1 Hit Point pro Stufe ist eingerechnet.':''))));
   const profs=profSet(c);
   const sk=h('div',{class:'skills'});for(const s of DATA.skills){const p=profs.has(s);const tg=skillTags(c)[s];sk.append(h('div',{class:'sk'+(p?' p':''),title:tg||''},h('span',{},s+' ',h('small',{style:'color:var(--sumi-3)'},ABN[SKILLAB[s]]),tg?h('small',{style:'color:var(--shu);font-weight:700'},' '+(/^Adv/.test(tg)?'ADV':'DIS')):null),h('span',{},sgn(m[SKILLAB[s]]+(p?pb:0)))))}
@@ -374,7 +376,7 @@ function viewSheet(c){const cl=C[c.classId];const m=mods(c);const pb=prof(c.leve
   notes.addEventListener('input',()=>{c.notes=notes.value;save()});
   {const nb=h('div');if(!c.names)c.names=REL3.map(rel=>({rel,name:'',wer:''}));c.names.forEach((n,i)=>{const a=h('input',{id:'sn3-'+i,value:n.name||'',placeholder:'Name'});a.addEventListener('input',()=>{n.name=a.value;save()});
     const b=h('input',{id:'sn3w-'+i,value:n.wer||'',placeholder:'Wer ist das?'});b.addEventListener('input',()=>{n.wer=b.value;save()});
-    nb.append(h('div',{class:'fields',style:'margin-bottom:10px'},h('div',{class:'field'},h('label',{for:'sn3-'+i},n.rel||REL3[i]),a),h('div',{class:'field'},h('label',{for:'sn3w-'+i},'Notiz'),b)))});
+    nb.append(h('div',{class:'fields bottom',style:'margin-bottom:10px'},h('div',{class:'field'},h('label',{for:'sn3-'+i},n.rel||REL3[i]),a),h('div',{class:'field'},h('label',{for:'sn3w-'+i},'Notiz'),b)))});
     w.append(sec('縁','Wen du kennst',nb))}
   {const sv=subView(c);if(sv)w.append(sec('進','Unterrasse · '+subLabel(subOf(c)),sv))}
   {const dv=dmView(c);if(dv)w.append(sec('師','Vom Spielleiter',dv))}
@@ -728,7 +730,7 @@ function samCombat(c){const d=c.dec||{},l=c.level,pb=prof(l),cb=CB(c);const w=h(
     NOTE(st==='Ittō'?'Ruhe gewinnen: Verzichtest du in deinem Zug auf Angriff und Bewegung, +1 Ruhe.':'Ruhe gewinnen: Triffst du in deinem Zug mit beiden Klingen dieselbe Kreatur, +1 Ruhe.'),
     l>=2?(st==='Ittō'?row(pbtn('Iaijutsu: '+ruhe+'d'+wd+' zusätzlich',()=>{if(!ruhe)return toast('Keine Ruhe');rollToast('Iaijutsu',ruhe+'d'+wd,0);set(0)},{disabled:!ruhe})):row(pbtn('Zweiter Himmel (−'+(l>=11?1:2)+' Ruhe)',()=>{const k=l>=11?1:2;if(ruhe<k)return toast('Zu wenig Ruhe');set(ruhe-k);toast('Zweiter Himmel: Verbindung als Bonus Action')}),pbtn('Wakizashi-Parade (−1 Ruhe, +3 AC)',()=>{if(ruhe<1)return toast('Zu wenig Ruhe');set(ruhe-1);toast('Parade: +3 AC gegen diesen Angriff')}))):NOTE('Haltungstechnik ab Stufe 2.')));
   const v=cb.verb||0;const full=l>=20&&d.vollendet&&cb.kata===d.vollendet;const n=full?3:v;
-  const known=[...(d.bewegungen||[]),...ce(c,'Bewegung').map(e=>e.name)];const fin=[['Schnitt','1d10'],['Stich','1d8'],['Fall','1d8']].filter(([k])=>known.includes(k));const extra=(d.schulen||[]);
+  const known=[...(d.bewegungen||[]),...ce(c,'Bewegung').map(e=>e.name)];const fin=[['Schnitt','1d10'],['Stich','1d8'],['Fall','1d8']].filter(([k])=>known.includes(k));const extra=schoolsOf(c);
   const kb=h('div');for(const k of known){const t=DATA.moveText[k]||ceText(c,k);if(t)kb.append(h('div',{class:'note',style:'margin:2px 0'},h('b',{},k+': '),t))}
   const katas=(d.katas||[]).map(k=>k.name).filter(Boolean);
   w.append(card('型 Kata',row(katas.length?h('select',{id:'kataSel','aria-label':'Kata',onchange:e=>cbUpd((c,cb)=>{cb.kata=e.target.value})},h('option',{value:''},'Kata wählen (optional)'),katas.map(k=>h('option',{value:k,selected:cb.kata===k},k))):null,
@@ -967,7 +969,8 @@ function moonPhase(c){const s=subOf(c);if(!s||s.sub!=='moonfolk')return null;if(
 function phaseSeg(t,ph){const m=t.match(new RegExp(ph+'[:]?\\s*([^·]*)'));return m?m[1].trim().replace(/\s*—.*$/,''):''}
 function initBonus(c){const ph=moonPhase(c);if(ph&&c.level>=6)return ph==='Vollmond'||c.level>=20?5:ph==='Halbmond'?2:0;return 0}
 function gashaBig(c){const s=subOf(c);return!!(s&&s.sub==='gashadokuro'&&c.dec&&c.dec.gestalt==='Groß und yokaihaft')}
-function skillTags(c){const t={};const ph=moonPhase(c);if(ph&&c.level>=6&&(ph==='Vollmond'||c.level>=20))t.Perception='Advantage · Der Zähler der Monde';if(gashaBig(c)){t.Athletics='Advantage · große Gestalt (STR-Checks)';t.Stealth='Disadvantage · große Gestalt'}return t}
+function passivePerc(c){const m=mods(c),pb=prof(c.level),p=profSet(c).has('Perception');const tg=skillTags(c).Perception||'';let v=10+m.wis+(p?pb:0),note='10 + WIS'+(p?' + Proficiency':'');if(/^Adv/.test(tg)){v+=5;note+=' + 5 (Advantage)'}else if(/^Dis/.test(tg)){v-=5;note+=' − 5 (Disadvantage)'}if(c.raceId==='rokurokubi'&&c.level>=13)note+=' · +5 bei aktivem langem Hals';return{v,note}}
+function skillTags(c){const t={};if(c.raceId==='tengu'&&c.level>=13)t.Perception='Advantage · Scharfsinniger Blick';const ph=moonPhase(c);if(ph&&c.level>=6&&(ph==='Vollmond'||c.level>=20))t.Perception='Advantage · Der Zähler der Monde';if(gashaBig(c)){t.Athletics='Advantage · große Gestalt (STR-Checks)';t.Stealth='Disadvantage · große Gestalt'}return t}
 function outcastBonus(c){const ph=moonPhase(c);if(!ph||c.level<16||!(c.dec&&c.dec.verstossen))return 0;return ph==='Vollmond'||c.level>=20?4:ph==='Halbmond'?2:0}
 function diceBtns(t,label){const ds=[...new Set(t.match(/\b\d+d\d+\b/g)||[])];return ds.map(x=>h('button',{class:'btn ghost small',type:'button',style:'margin:4px 4px 0 0',onclick:()=>rollToast(label,x,0)},'🎲 '+x))}
 function subTrackers(c){const s=subOf(c);if(!s)return[];
@@ -1090,6 +1093,7 @@ function ovOf(c){const r=(store.forced||{})[c.id];return r||c.dmo||{}}
 function subOf(c){const r=(store.forced||{})[c.id];if(r&&'sub'in r)return r.sub?r:null;if(c.dmo&&'sub'in c.dmo)return c.dmo.sub?c.dmo:null;return c.sub||null}
 const EL_TYPES={samurai:['Bewegung','Kata','Schule'],yokaihunter:['Griff','Gegenmittel'],sohei:['Bürde-Nutzung'],schreinpriester:['Talisman','Ritual'],kamikagari:['Göttliche Gabe'],onmyoji:['Formel','Shikigami'],hanyo:['Pakt-Fähigkeit'],biwahoshi:['Strophe'],ninja:['Technik']};
 const EL_ART={Bewegung:['Auftakt','Verbindung','Abschluss'],Griff:['Anschlag','Hetze','Riss']};
+const SCHOOLS=['Seiten-ryū','Niten Ichi-ryū'];function schoolsOf(c){return[...new Set([...(c.dec&&c.dec.schulen||[]),...ce(c,'Schule').map(e=>e.name).filter(n=>SCHOOLS.includes(n))])]}
 function ce(c,typ){return(ovOf(c).elements||[]).filter(e=>!typ||e.typ===typ)}
 function ceText(c,name){const e=(ovOf(c).elements||[]).find(x=>x.name===name);return e?e.text:''}
 function ceArt(c,name){const e=(ovOf(c).elements||[]).find(x=>x.name===name);return e?e.art:''}
@@ -1101,7 +1105,7 @@ function deliverDm(){const got=[];for(const c of S.chars){const o=ovOf(c);for(co
       if(it.mat&&c.classId==='yokaihunter'){c.dec=c.dec||{};const t=(c.dec.teile=c.dec.teile||[]);const r=t.find(y=>y.art.toLowerCase()===it.mat.art.toLowerCase());if(r)r.n+=+it.mat.n||0;else t.push({art:it.mat.art,n:+it.mat.n||0});got.push((c.name||'Charakter')+': '+it.mat.n+' Yokai-Teile ('+it.mat.art+')');continue}
       const x={id:uid(),n:it.n,d:(it.d?it.d+' · ':'')+'vom Spielleiter',q:+it.q||1,w:+it.w||catW(it.n),dm:true};if(it.armor)x.armor={...it.armor};if(!ITEM[it.n])x.custom=true;c.inv.push(x);got.push((c.name||'Charakter')+': '+it.n)}}
   if(got.length){save();render();toast('Vom Spielleiter erhalten · '+got.join(', '))}}
-function dmView(c){const o=ovOf(c);const els=o.elements||[],races=o.races||[];if(!els.length&&!races.length)return null;const w=h('div');
+function dmView(c){const o=ovOf(c);const els=(o.elements||[]).filter(e=>!(e.typ==='Schule'&&SCHOOLS.includes(e.name))),races=o.races||[];if(!els.length&&!races.length)return null;const w=h('div');
   for(const r of races){const tl=h('div');for(const t of (r.traits||[]).slice().sort((a,b)=>(+a.lv||1)-(+b.lv||1))){const on=(+t.lv||1)<=c.level;
       tl.append(h('div',{class:'feat',style:on?'':'opacity:.5'},h('div',{class:'addrow',style:'align-items:center;flex-wrap:wrap'},h('span',{class:'lv'},'Stufe '+(+t.lv||1)),h('b',{},t.name),+t.uses?h('span',{class:'chip'},t.uses+'× pro '+(t.reset==='short'?'Short':'Long')+' Rest'):null),on?h('p',{class:'note',style:'margin:4px 0 0;white-space:pre-wrap'},t.text||''):null))}
     w.append(card('種 '+r.name,r.text?h('p',{class:'note',style:'white-space:pre-wrap'},r.text):null,tl))}
@@ -1189,6 +1193,7 @@ function dmTools(c,src){const o=JSON.parse(JSON.stringify(ovOf(c)));const set=fn
   const ell=h('div');(o.elements||[]).forEach((e,i)=>ell.append(h('div',{class:'feat'},h('div',{class:'addrow',style:'align-items:center;flex-wrap:wrap'},h('span',{class:'chip shu'},e.typ),e.art?h('span',{class:'chip'},e.art):null,h('b',{},e.name),sbtn('✕',()=>set(o=>{o.elements.splice(i,1)}),{'aria-label':'Element entfernen'})),h('p',{class:'note',style:'margin:4px 0 0'},e.text||''))));
   w.append(card('研 Erforschtes Klassenelement hinzufügen',row(tsel,asel,al),row(en),et,row(h('label',{class:'note',for:'elUses'},'Nutzungen (0 = unbegrenzt)'),eu,h('span',{class:'note'},'pro'),er,
       pbtn('Hinzufügen',()=>{if(!en.value.trim())return toast('Name fehlt');const e={id:uid(),typ:tsel.value,art:asel.value.trim(),name:en.value.trim(),text:et.value.trim(),uses:+eu.value||0,reset:er.value};set(o=>{o.elements=[...(o.elements||[]),e]})},{id:'elBtn'})),
+    c.classId==='samurai'?h('div',{style:'margin-top:8px'},h('div',{class:'label'},'Meisterschulen freischalten'),row(...SCHOOLS.map(n=>schoolsOf(c).includes(n)?h('span',{class:'chip'},'✓ '+n):sbtn(n+' freischalten',()=>set(o=>{o.elements=[...(o.elements||[]),{id:uid(),typ:'Schule',art:'',name:n,text:'',uses:0,reset:'long'}]}),{id:'school-'+n.split(' ')[0]})))):null,
     ell.childNodes.length?h('div',{style:'margin-top:8px'},ell):null,NOTE('Bewegungen, Griffe, Talismane und Strophen erscheinen beim Spieler direkt in seiner Klasse und im Kampf, alles andere als „Erforschte Elemente“ auf Bogen und Kampfseite.')));
   const rn=h('input',{id:'raceName',placeholder:'Name, z. B. Chimera'}),rt=h('textarea',{id:'raceText',rows:'2',placeholder:'Beschreibung (optional)',style:'width:100%;padding:8px;border:1px solid var(--line);border-radius:3px;background:var(--paper);color:var(--sumi);font:inherit'});
   const rl=h('div');(o.races||[]).forEach((r,i)=>{const tl=h('div');(r.traits||[]).forEach((t,j)=>tl.append(row(h('span',{class:'lv'},'St. '+(+t.lv||1)),h('b',{},t.name),+t.uses?h('span',{class:'chip'},t.uses+'×/'+(t.reset==='short'?'SR':'LR')):null,h('span',{class:'note',style:'flex:1;min-width:120px'},t.text||''),sbtn('✕',()=>set(o=>{o.races[i].traits.splice(j,1)}),{'aria-label':'Merkmal entfernen'}))));
@@ -1467,7 +1472,7 @@ function viewClass(c){R_(c);const l=c.level,m=mods(c),d=c.dec,w=h('div');const c
       ...(l>=20?[textRow(c,'vollendet','Vollendete Schule · Kata ohne Verbindungen','Name der Kata')]:[]),
       listRow(c,'katas','Katas',[{k:'name',l:'Name'},{k:'folge',l:'Folge (Auftakt → Verbindungen → Abschluss)',wide:true}],null),
       listRow(c,'eide','Eide',[{k:'text',l:'Wortlaut',wide:true},{k:'stufe',l:'Stufe',opts:['Klein','Groß','Todeseid']},{k:'status',l:'Status',opts:['aktiv','erfüllt','gebrochen']}],null,`Gleichzeitig aktiv: höchstens ${lvMax(l,[[1,1],[7,2],[15,3]])}. Klein: +2 AC, Bruch 2 Soul HP · Groß: +2d8 Schaden, Bruch 5 Soul HP · Todeseid: Advantage, Bruch Soul HP auf 0 und Kegare.`),
-      pickRow(c,'schulen','Erlernte Schulen',[{n:'Seiten-ryū'},{n:'Niten Ichi-ryū'}],2,'Nicht bei der Erschaffung wählbar: Grabwächter bzw. Musashi.'));break}
+      schoolsOf(c).length?h('div',{class:'feat'},h('b',{},'Erlernte Schulen: '),schoolsOf(c).join(', '),h('p',{class:'note',style:'margin:4px 0 0'},'Die Techniken stehen unter Regeln und im Kampf bei der Kata.')):null);break}
     case 'yokaihunter':{box.append(choiceRow(c,'fokus','Waffenfokus',['Bogen','Klinge']),textRow(c,'stil','Name deines Jagdstils'),
       pickRow(c,'griffe','Griffe',YH_GRIFFE.map(([g,n])=>({g,n})),lvMax(l,[[1,3],[6,4],[11,5],[17,6]]),'Auf Stufe 1 je ein Anschlag, eine Hetze und ein Riss.'),
       h('div',{class:'label',style:'margin:8px 0 6px'},'Jagdbuch'),jagdbuchDoc(c,true));break}
@@ -1571,7 +1576,7 @@ function classStepApply(c,st){const D=st.dec;const o={};switch(c.classId){
 function viewRules(c){const cl=C[c.classId],r=R[c.raceId];const w=h('div');
   const cr=h('div');if(cl.intro&&cl.intro.length)cr.append(renderLines(cl.intro));
   const bas=h('details',{},h('summary',{},'Grundlagen'),renderLines(Object.entries(cl.basics).map(([k,v])=>k+': '+v)));cr.append(bas);
-  for(const s of cl.rules)cr.append(h('details',{},h('summary',{},s.h),renderLines(s.body)));
+  for(const s of cl.rules){const sc=SCHOOLS.find(n=>s.h.startsWith(n));if(sc&&!schoolsOf(c).includes(sc))continue;cr.append(h('details',{},h('summary',{},s.h),renderLines(s.body)))}
   const tb=h('details',{},h('summary',{},'Stufenübersicht'));const t=h('table');t.append(h('tr',{},h('th',{},'Stufe'),h('th',{},'Meilenstein')));for(let i=1;i<=20;i++)t.append(h('tr',{},h('td',{},i),h('td',{},cl.milestones[i]||'—')));tb.append(h('div',{class:'tblw'},t));for(const n of cl.msnotes||[])tb.append(h('p',{class:'note'},n));cr.append(tb);
   w.append(sec(cl.kanji.slice(0,1),'Klasse: '+cl.name,cr));
   const rr=h('div');rr.append(h('p',{class:'note'},r.attr));for(const x of r.extra||[])rr.append(h('p',{class:'note'},x));
@@ -1630,7 +1635,7 @@ function openCreate(){let st={step:1,raceId:null,classId:null,name:'',clan:'Ōto
     if(st.step===5){d.append(h('p',{class:'note'},'Schreib drei Namen auf. Diese drei Menschen werden vorkommen. Manche Klassen bauen ihre Mechanik direkt darauf auf, und alle anderen gewinnen dadurch. Gib ihnen Namen, keine Rollen: nicht „meine Schwester“, sondern einen Namen.'));
       REL3.forEach((rel,i)=>{const n=st.names[i];const a=h('input',{id:'n3-'+i,value:n.name,placeholder:'Name'});a.addEventListener('input',()=>{n.name=a.value;okBtn.disabled=!valid()});
         const b=h('input',{id:'n3w-'+i,value:n.wer,placeholder:'Wer ist das? (optional)'});b.addEventListener('input',()=>{n.wer=b.value});
-        d.append(h('div',{class:'fields',style:'margin-top:14px'},h('div',{class:'field'},h('label',{for:'n3-'+i},rel),a),h('div',{class:'field'},h('label',{for:'n3w-'+i},'Notiz'),b)))})}
+        d.append(h('div',{class:'fields bottom',style:'margin-top:14px'},h('div',{class:'field'},h('label',{for:'n3-'+i},rel),a),h('div',{class:'field'},h('label',{for:'n3w-'+i},'Notiz'),b)))})}
     const valid=()=>st.step===1?!!st.raceId:st.step===2?!!st.classId:st.step===4?!!(profStepValid(st)&&gearValid(st)&&classStepValid(st)):st.step===5?st.names.every(n=>n.name.trim()):(st.name.trim()&&(!R[st.raceId].choose||st.raceChoice.length===2)&&(!(RACE_SK[st.raceId]&&RACE_SK[st.raceId].choose)||(st.raceSkills||[]).length===1)&&(!C[st.classId].skills.n||st.skills.length===C[st.classId].skills.n));
     const okBtn=h('button',{class:'btn',type:'button',disabled:!valid(),onclick:()=>{if(st.step<5){st.step++;draw();d.scrollTop=0}else create(st)}},st.step<5?'Weiter':'Siegel setzen');
     d.append(h('div',{class:'foot'},h('button',{class:'btn ghost',type:'button',onclick:()=>{if(st.step>1){st.step--;draw()}else closeModal()}},st.step>1?'Zurück':'Abbrechen'),okBtn))};draw()})}
