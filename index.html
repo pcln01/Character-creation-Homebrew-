@@ -1103,7 +1103,9 @@ function dmTrackers(c){const o=ovOf(c);const out=[];
   for(const e of o.elements||[])if(+e.uses>0)out.push({k:'ce:'+e.id,l:e.name,max:+e.uses,reset:e.reset||'long',n:'Vom Spielleiter · '+e.typ});
   for(const r of o.races||[])for(const t of r.traits||[])if(+t.uses>0&&(+t.lv||1)<=c.level)out.push({k:'cr:'+r.id+':'+t.id,l:t.name+' · '+r.name,max:+t.uses,reset:t.reset||'long',n:'Vom Spielleiter · ab Stufe '+(+t.lv||1)});
   return out}
-function deliverDm(){const got=[];for(const c of S.chars){const o=ovOf(c);for(const it of o.items||[]){c.dmGot=c.dmGot||[];if(c.dmGot.includes(it.id))continue;c.dmGot.push(it.id);
+function clanSync(c,o,got){if(o.clan===undefined||o.clan===c.clan)return;const was=c.clan;c.clan=o.clan;const cn=x=>x==='Kume'?'Kleidung des Kume-Clans':x==='Ōtomo'?'Kleidung des Ōtomo-Clans':null;const a=cn(was),b=cn(c.clan);
+  if(a&&b){const it=(c.inv||[]).find(i=>i.n===a&&!i.custom);if(it&&ITEM[b]){it.n=b;it.d=ITEM[b].d}}got.push((c.name||'Charakter')+': '+(c.clan==='keine'?'keine Clan-Angehörigkeit':'Clan '+c.clan))}
+function deliverDm(){const got=[];for(const c of S.chars){const o=ovOf(c);clanSync(c,o,got);for(const it of o.items||[]){c.dmGot=c.dmGot||[];if(c.dmGot.includes(it.id))continue;c.dmGot.push(it.id);
       if(it.mat&&c.classId==='yokaihunter'){c.dec=c.dec||{};const t=(c.dec.teile=c.dec.teile||[]);const r=t.find(y=>y.art.toLowerCase()===it.mat.art.toLowerCase());if(r)r.n+=+it.mat.n||0;else t.push({art:it.mat.art,n:+it.mat.n||0});got.push((c.name||'Charakter')+': '+it.mat.n+' Yokai-Teile ('+it.mat.art+')');continue}
       const x={id:uid(),n:it.n,d:(it.d?it.d+' · ':'')+'vom Spielleiter',q:+it.q||1,w:+it.w||catW(it.n),dm:true};if(it.armor)x.armor={...it.armor};if(!ITEM[it.n])x.custom=true;c.inv.push(x);got.push((c.name||'Charakter')+': '+it.n)}}
   if(got.length){save();render();toast('Vom Spielleiter erhalten · '+got.join(', '))}}
@@ -1180,7 +1182,7 @@ function dropsPane(c,o,set,src){const w=h('div');
   return w}
 function dmTools(c,src){const o=JSON.parse(JSON.stringify(ovOf(c)));const set=fn=>{fn(o);saveOverlay(c,o,src)};const w=h('div');
   const fc=forceControls(c,subOf(c),v=>set(o=>{if(v){o.sub=v.sub;if(v.stufe)o.stufe=v.stufe;else delete o.stufe}else{o.sub=null;delete o.stufe}}));if(fc)w.append(card('進 Unterrasse',fc));
-  const cv=clanOf(c);w.append(card('家 Clan',h('div',{class:'pick'},[['Ōtomo','Ōtomo'],['Kume','Kume'],['keine','Keine Clan-Angehörigkeit']].map(([v,l])=>h('button',{class:'pill',type:'button',id:'clan-'+v,'aria-pressed':String(cv===v),onclick:()=>set(o=>{if(v===c.clan)delete o.clan;else o.clan=v})},l))),NOTE('Gilt sofort für Bogen, PDF und Gruppenansicht. Das Inventar bleibt unverändert.')));
+  const cv=clanOf(c);w.append(card('家 Clan',h('div',{class:'pick'},[['Ōtomo','Ōtomo'],['Kume','Kume'],['keine','Keine Clan-Angehörigkeit']].map(([v,l])=>h('button',{class:'pill',type:'button',id:'clan-'+v,'aria-pressed':String(cv===v),onclick:()=>set(o=>{o.clan=v})},l))),NOTE('Gilt sofort für Bogen, PDF und Gruppenansicht. Das Inventar bleibt unverändert.')));
   const isel=h('select',{id:'giveItem','aria-label':'Item aus dem Katalog'},h('option',{value:''},'Aus dem Katalog …'),DATA.items.map(i=>h('option',{value:i.n},i.n+' ('+i.cat+')')));
   const iname=h('input',{id:'giveName',placeholder:'oder eigenes Item: Name'}),idesc=h('input',{id:'giveDesc',placeholder:'Beschreibung / Wirkung',style:'flex:1;min-width:200px'}),iw=nIn('giveW',0,0,999,64),iq=nIn('giveQ',1,1,99,56);
   isel.addEventListener('change',()=>{const cat=ITEM[isel.value];if(cat){iname.value='';iw.value=cat.w||0;idesc.placeholder=cat.d||'Beschreibung / Wirkung'}});iname.addEventListener('input',()=>{const w=catW(iname.value);if(w)iw.value=w});
