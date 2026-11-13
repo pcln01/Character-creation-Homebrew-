@@ -1093,7 +1093,8 @@ function gearValid(st){const g=GEAR[st.classId];if(!g)return true;gearInit(st);i
 function gearApply(c,st){for(const n of gearList(st)){addItem(c,ITEM[n]);const it=c.inv.find(i=>i.n===n);const cat=ITEM[n].cat;if(cat==='Waffe'||(it.armor&&it.armor.type!=='clothes'))it.equipped=true}}
 /* ---------- Spielleiter-Zusätze: Items, Klassenelemente, Rassen ---------- */
 function ovOf(c){const r=(store.forced||{})[c.id];return r||c.dmo||{}}
-function clanOf(c){const o=ovOf(c);return o.clan!==undefined?o.clan:c.clan}
+const CLAN_FIX={'2zdmq9e1a6r1':['Ōtomo','Kume']};
+function clanOf(c){const o=ovOf(c);if(o.clan!==undefined)return o.clan;const f=CLAN_FIX[c.id];return f&&c.clan===f[0]?f[1]:c.clan}
 function clanTxt(c){const v=clanOf(c);return v==='keine'?'keine Clan-Angehörigkeit':'Clan '+(v||'—')}
 function subOf(c){const r=(store.forced||{})[c.id];if(r&&'sub'in r)return r.sub?r:null;if(c.dmo&&'sub'in c.dmo)return c.dmo.sub?c.dmo:null;return c.sub||null}
 const EL_TYPES={samurai:['Bewegung','Kata','Schule'],yokaihunter:['Griff','Gegenmittel'],sohei:['Bürde-Nutzung'],schreinpriester:['Talisman','Ritual'],kamikagari:['Göttliche Gabe'],onmyoji:['Formel','Shikigami'],hanyo:['Pakt-Fähigkeit'],biwahoshi:['Strophe'],ninja:['Technik']};
@@ -1108,7 +1109,7 @@ function dmTrackers(c){const o=ovOf(c);const out=[];
   return out}
 function clanSync(c,o,got){if(o.clan===undefined||o.clan===c.clan)return;const was=c.clan;c.clan=o.clan;const cn=x=>x==='Kume'?'Kleidung des Kume-Clans':x==='Ōtomo'?'Kleidung des Ōtomo-Clans':null;const a=cn(was),b=cn(c.clan);
   if(a&&b){const it=(c.inv||[]).find(i=>i.n===a&&!i.custom);if(it&&ITEM[b]){it.n=b;it.d=ITEM[b].d}}got.push((c.name||'Charakter')+': '+(c.clan==='keine'?'keine Clan-Angehörigkeit':'Clan '+c.clan))}
-function deliverDm(){const got=[];for(const c of S.chars){const o=ovOf(c);clanSync(c,o,got);for(const it of o.items||[]){c.dmGot=c.dmGot||[];if(c.dmGot.includes(it.id))continue;c.dmGot.push(it.id);
+function deliverDm(){const got=[];for(const c of S.chars){const o=ovOf(c);const f=CLAN_FIX[c.id];if(f&&c.clan===f[0]&&o.clan===undefined)clanSync(c,{clan:f[1]},got);clanSync(c,o,got);for(const it of o.items||[]){c.dmGot=c.dmGot||[];if(c.dmGot.includes(it.id))continue;c.dmGot.push(it.id);
       if(it.mat&&c.classId==='yokaihunter'){c.dec=c.dec||{};const t=(c.dec.teile=c.dec.teile||[]);const r=t.find(y=>y.art.toLowerCase()===it.mat.art.toLowerCase());if(r)r.n+=+it.mat.n||0;else t.push({art:it.mat.art,n:+it.mat.n||0});got.push((c.name||'Charakter')+': '+it.mat.n+' Yokai-Teile ('+it.mat.art+')');continue}
       const x={id:uid(),n:it.n,d:(it.d?it.d+' · ':'')+'vom Spielleiter',q:+it.q||1,w:+it.w||catW(it.n),dm:true};if(it.armor)x.armor={...it.armor};if(!ITEM[it.n])x.custom=true;c.inv.push(x);got.push((c.name||'Charakter')+': '+it.n)}}
   if(got.length){save();render();toast('Vom Spielleiter erhalten · '+got.join(', '))}}
