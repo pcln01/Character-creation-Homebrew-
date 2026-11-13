@@ -80,8 +80,9 @@ h1,h2,h3{font-family:var(--f-disp);text-wrap:balance;margin:0;font-weight:700}
 .lvl{text-align:center}
 .lvl .n{font-family:var(--f-disp);font-size:44px;font-weight:800;line-height:1;color:var(--shu)}
 .lvl .l{font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:var(--sumi-3)}
-.tabs{display:flex;gap:2px;margin-top:18px;border-bottom:1px solid var(--line);overflow-x:auto}
-.tab{background:none;border:0;padding:10px 14px;cursor:pointer;color:var(--sumi-3);font-weight:700;border-bottom:2px solid transparent;white-space:nowrap;display:flex;gap:8px;align-items:baseline}
+.tabs{display:flex;flex-wrap:wrap;gap:2px;margin-top:18px;border-bottom:1px solid var(--line)}
+@media (max-width:700px){.tabs{flex-wrap:nowrap;overflow-x:auto}}
+.tab{background:none;border:0;padding:10px 8px;cursor:pointer;color:var(--sumi-3);font-weight:700;border-bottom:2px solid transparent;white-space:nowrap;display:flex;gap:8px;align-items:baseline}
 .tab .k{font-family:var(--f-disp);font-size:13px;color:var(--sumi-3)}
 .tab[aria-selected="true"]{color:var(--sumi);border-bottom-color:var(--shu)}
 .tab[aria-selected="true"] .k{color:var(--shu)}
@@ -89,6 +90,7 @@ h1,h2,h3{font-family:var(--f-disp);text-wrap:balance;margin:0;font-weight:700}
 .sec{display:grid;grid-template-columns:34px minmax(0,1fr);gap:14px;margin-bottom:28px}
 .sec>.vt{writing-mode:vertical-rl;font-family:var(--f-disp);font-weight:800;font-size:20px;color:var(--shu);letter-spacing:.2em;border-right:1px solid var(--shu);padding-right:8px;justify-self:end}
 .sec h2{font-size:20px;margin-bottom:10px}
+.foldb{display:flex;align-items:baseline;gap:10px;width:100%;background:none;border:0;padding:0;margin:0 0 10px;font:inherit;color:inherit;cursor:pointer;text-align:left}.foldb h2{margin:0}.foldb .chev{color:var(--shu);font-size:14px}.foldb[aria-expanded=false]{margin-bottom:0}
 .label{font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--sumi-3);font-weight:700}
 /* abilities */
 .abil{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:10px}
@@ -326,12 +328,12 @@ function render(){renderRoster();const m=$('#main');m.textContent='';
   if(S.party){m.append(viewParty());return}
   const c=cur();if(!c){m.append(viewEmpty());return}
   m.append(viewHead(c));
-  const tabs=[['sheet','Bogen','書'],['fight','Kampf','戦'],['class','Klasse','流'],['grow','Aufstieg','成長'],['inv','Inventar','持物'],['rules','Regeln','巻']];
+  const tabs=[['sheet','Bogen','書'],['fight','Kampf','戦'],['class','Klasse','流'],...(c.classId==='yokaihunter'?[['book','Jagdbuch','冊']]:c.classId==='kamikagari'?[['links','Social Links','絆']]:[]),['grow','Aufstieg','成長'],['inv','Inventar','持物'],['rules','Regeln','巻']];if(!tabs.some(t=>t[0]===S.tab))S.tab='sheet';
   const tl=h('div',{class:'tabs',role:'tablist'});
   for(const[k,l,kj]of tabs)tl.append(h('button',{class:'tab',role:'tab','aria-selected':String(S.tab===k),type:'button',onclick:()=>{S.tab=k;render()}},h('span',{class:'k'},kj),l));
   m.append(tl);
   const p=h('div',{class:'panel',role:'tabpanel'});
-  p.append(S.tab==='sheet'?viewSheet(c):S.tab==='fight'?viewCombat(c):S.tab==='class'?viewClass(c):S.tab==='grow'?viewGrow(c):S.tab==='inv'?viewInv(c):viewRules(c));m.append(p)}
+  p.append(S.tab==='sheet'?viewSheet(c):S.tab==='fight'?viewCombat(c):S.tab==='class'?viewClass(c):S.tab==='book'?viewBook(c):S.tab==='links'?viewLinks(c):S.tab==='grow'?viewGrow(c):S.tab==='inv'?viewInv(c):viewRules(c));m.append(p)}
 
 function renderRoster(){const r=$('#roster');r.textContent='';
   for(const c of S.chars){const cl=C[c.classId];r.append(h('button',{class:'rbtn',type:'button','aria-current':String(!S.party&&!S.dm&&c.id===S.sel),onclick:()=>{S.sel=c.id;S.party=false;S.dm=false;render()}},
@@ -388,6 +390,8 @@ function vital(label,val,max,key,cls){const inp=h('input',{class:'num',type:'num
   inp.addEventListener('change',()=>upd(c=>{c[key]=Math.max(0,Math.min(max,+inp.value||0))}));
   return h('div',{class:'vital'},h('div',{class:'label'},label),h('div',{class:'big'},val,h('small',{},' / '+max)),h('div',{class:'bar '+cls},h('i',{style:`width:${Math.max(0,Math.min(100,val/max*100))}%`})),
     h('div',{class:'row'},inp,h('button',{class:'btn ghost small',type:'button',onclick:()=>upd(c=>{c[key]=max})},'Voll')))}
+let FOLD={};try{FOLD=JSON.parse(localStorage.getItem('siegelrolle-fold')||'{}')||{}}catch(e){}
+function foldSec(id,kj,title,...kids){const shut=!!FOLD[id];return h('section',{class:'sec'},h('div',{class:'vt','aria-hidden':'true'},kj),h('div',{},h('button',{type:'button',class:'foldb',id:'fold-'+id,'aria-expanded':String(!shut),onclick:()=>{FOLD={...FOLD,[id]:!shut};try{localStorage.setItem('siegelrolle-fold',JSON.stringify(FOLD))}catch(e){}render()}},h('h2',{},title),h('span',{class:'chev','aria-hidden':'true'},shut?'▸ aufklappen':'▾')),shut?null:h('div',{},...kids)))}
 function sec(kj,title,...kids){return h('section',{class:'sec'},h('div',{class:'vt','aria-hidden':'true'},kj),h('div',{},h('h2',{},title),...kids))}
 function confirmDel(c){modal(d=>{d.append(h('h2',{},'„'+(c.name||'Ohne Namen')+'“ löschen?'),h('p',{class:'note'},'Der Charakter verschwindet von deiner Rolle und aus der Gruppenansicht. Das lässt sich nicht rückgängig machen.'),
   h('div',{class:'foot'},h('button',{class:'btn ghost',type:'button',onclick:closeModal},'Behalten'),h('button',{class:'btn',type:'button',onclick:()=>{driveRemove(c.id);S.chars=S.chars.filter(x=>x.id!==c.id);S.sel=S.chars[0]?.id||null;closeModal();save();render();toast('Charakter gelöscht')}},'Endgültig löschen')))})}
@@ -795,7 +799,7 @@ function priestCombat(c){const d=c.dec||{},l=c.level,pb=prof(l),m=mods(c);const 
 /* ---------- Kami-kagari ---------- */
 function kamiCombat(c){const d=c.dec||{},l=c.level;const w=h('div');const owned=(d.goetter||[]).filter(g=>g.gott&&DATA.gods[g.gott]);const maxR=lvMax(l,[[1,1],[4,2],[6,3],[8,4],[10,5],[12,6],[14,7],[16,8],[18,9],[20,10]]);
   const dp=resVal(c,'dp',l);const kan=d.kanal&&owned.find(g=>g.gott===d.kanal)?d.kanal:(owned[0]||{}).gott;
-  if(!owned.length)return NOTE('Noch kein Gott eingetragen (Reiter „Klasse“).');
+  if(!owned.length)return NOTE('Noch kein Gott eingetragen (Reiter „Social Links“).');
   const pay=(n,label)=>upd(c=>{R_(c);const have=resVal(c,'dp',c.level);const fromDp=Math.min(have,n);c.res.dp=have-fromDp;const rest=n-fromDp;if(rest>0)c.soul=Math.max(0,(c.soul??soulMax(c))-rest);toast(label+': '+fromDp+' DP'+(rest?' + '+rest+' Soul HP':''))});
   w.append(card('神 Kanalisiert · Wechsel als Bonus Action',h('div',{class:'pick'},owned.map(g=>h('button',{class:'pill',type:'button','aria-pressed':String(kan===g.gott),onclick:()=>decSet('kanal',g.gott)},g.gott+' · Rang '+Math.min(+g.rang||1,maxR)))),h('p',{style:'margin:6px 0'},'Divinity Points: '+dp+' / '+l)));
   const g=owned.find(x=>x.gott===kan);const G=DATA.gods[kan];const rang=Math.min(+g.rang||1,maxR);
@@ -1279,7 +1283,7 @@ function viewInv(c){const cl=C[c.classId];const w=h('div');c.inv=c.inv||[];
   const g=h('input',{class:'num',type:'number',id:'gold',value:c.gold||0,min:'0','aria-label':'Goldstücke'});g.addEventListener('change',()=>upd(c=>{c.gold=Math.max(0,+g.value||0)}));
   const load=h('div',{class:'vital'+(over?' over':'')},h('div',{class:'label'},'Traglast'),h('div',{class:'big'},fmtW(tot),h('small',{},' / '+cap+' lb.')),h('div',{class:'bar'},h('i',{style:`width:${Math.min(100,tot/cap*100)}%`})),
     h('div',{class:'note',style:over?'color:var(--shu);font-weight:700':''},over?'Überladen: Du trägst mehr, als du kannst.':'STR '+score(c,'str')+' × 15'+(c.raceId==='oni'?(c.level>=3?' × 4 (Oni)':' × 2 (Oni)'):'')));
-  if(c.classId==='yokaihunter'){w.append(sec('冊','Jagdbuch',jagdbuchDoc(c,false)),sec('薬','Gegenmittel-Beutel',gmBag(c)))}
+  if(c.classId==='yokaihunter'){w.append(sec('薬','Gegenmittel-Beutel',gmBag(c)))}
   w.append(sec('金','Geld und Traglast',h('div',{class:'vitals',style:'grid-template-columns:repeat(2,minmax(0,1fr))'},h('div',{class:'vital'},h('div',{class:'label'},'Goldstücke'),h('div',{class:'gold',style:'margin-top:6px'},h('span',{class:'coin'},'金'),g),h('div',{class:'note'},'50 Münzen wiegen 1 lb.')),load)));
   const list=h('div',{class:'inv'});
   if(!c.inv.length)list.append(h('p',{class:'note'},'Dein Bündel ist leer. Übernimm die gemeinsame Ausrüstung oder füge Gegenstände aus den Listen unten hinzu.'));
@@ -1449,7 +1453,7 @@ function openShrine(c){modal(d=>{const kk=c.classId==='kamikagari';
   if(c.classId==='sohei'&&c.level>=7)opts.push(['Niō-Gestalt wieder bereit',c=>{R_(c);c.res.nio=0}]);
   if(!opts.length)d.append(h('p',{},'Für dich gibt es hier gerade nichts zurückzusetzen.'));
   for(const[l,fn]of opts)d.append(h('button',{class:'btn',type:'button',style:'margin:6px 8px 0 0',onclick:()=>{upd(fn);closeModal();toast(l)}},l));
-  if(kk)d.append(h('p',{class:'note',style:'margin-top:12px'},'Social Links steigerst du im Reiter „Klasse“: höchstens 2 Ränge pro Aufenthalt, frei auf deine Götter verteilt.'));
+  if(kk)d.append(h('p',{class:'note',style:'margin-top:12px'},'Social Links steigerst du im Reiter „Social Links“: höchstens 2 Ränge pro Aufenthalt, frei auf deine Götter verteilt.'));
   d.append(h('div',{class:'foot'},h('button',{class:'btn ghost',type:'button',onclick:closeModal},'Schließen')))})}
 
 /* ---------- class decisions ---------- */
@@ -1472,6 +1476,15 @@ function listRow(c,k,label,fields,limit,note){const rows=(c.dec||{})[k]||[];cons
   wrap.append(tb,h('button',{class:'btn ghost small',type:'button',style:'margin-top:8px',disabled:limit!=null&&rows.length>=limit,onclick:()=>upd(c=>{R_(c);c.dec[k]=[...(c.dec[k]||[]),{}]})},'＋ Eintrag'));
   if(note)wrap.append(h('p',{class:'note'},note));return wrap}
 
+function viewBook(c){return h('div',{},sec('冊','Jagdbuch',jagdbuchDoc(c,false)))}
+function viewLinks(c){R_(c);const l=c.level,d=c.dec;const maxR=lvMax(l,[[1,1],[4,2],[6,3],[8,4],[10,5],[12,6],[14,7],[16,8],[18,9],[20,10]]);const maxG=lvMax(l,[[1,1],[5,2],[10,3],[15,4],[20,5]]);const rows=d.goetter||[];
+  const w=h('div');w.append(sec('絆','Götter und Social Links',listRow(c,'goetter','Götter',[{k:'gott',l:'Gott',opts:GODS.filter(([s])=>s<=l).map(([s,n])=>n)},{k:'rang',l:'Social Link',num:true,min:1,max:maxR}],maxG,`Neue Götter auf den Stufen 1, 5, 10, 15 und 20. Höchster Rang auf deiner Stufe: ${maxR}. Steigern nur am Schrein, höchstens 2 Ränge pro Aufenthalt.`)));
+  const owned=rows.filter(g=>g.gott&&DATA.gods[g.gott]);
+  for(const g of owned){const G=DATA.gods[g.gott];const rang=Math.min(+g.rang||1,maxR);const kl=h('div');
+    for(const r of G.ranks)kl.append(h('div',{class:'feat',style:r.r<=rang?'':'opacity:.5'},h('div',{class:'addrow',style:'align-items:center;flex-wrap:wrap'},h('span',{class:'lv'},'Rang '+r.r),/:/.test(r.t)&&r.t.indexOf(':')<60?h('b',{},r.t.split(':')[0]):null,h('span',{class:'chip'},r.cost||'—'),r.r>rang?h('span',{class:'note'},r.r>maxR?'ab höherer Stufe':'noch nicht erreicht'):null),r.r<=rang?h('p',{class:'note',style:'margin:4px 0 0'},r.t):null));
+    w.append(foldSec('sl-'+g.gott,'神',g.gott+' · Rang '+rang+' von 10',h('p',{class:'note'},'Tabu: '+G.tabu),kl))}
+  w.append(sec('禁','Gebrochene Tabus',listRow(c,'tabus','Gebrochene Tabus',[{k:'gott',l:'Gott'},{k:'was',l:'Was passiert ist',wide:true}],null)));
+  return w}
 function viewClass(c){R_(c);const l=c.level,m=mods(c),d=c.dec,w=h('div');const cs=counters(c);
   if(cs.length)w.append(sec('源','Ressourcen',counterGrid(c,cs)));
   const box=h('div');
@@ -1484,16 +1497,14 @@ function viewClass(c){R_(c);const l=c.level,m=mods(c),d=c.dec,w=h('div');const c
       schoolsOf(c).length?h('div',{class:'feat'},h('b',{},'Erlernte Schulen: '),schoolsOf(c).join(', '),h('p',{class:'note',style:'margin:4px 0 0'},'Die Techniken stehen unter Regeln und im Kampf bei der Kata.')):null);break}
     case 'yokaihunter':{box.append(choiceRow(c,'fokus','Waffenfokus',['Bogen','Klinge']),textRow(c,'stil','Name deines Jagdstils'),
       pickRow(c,'griffe','Griffe',YH_GRIFFE.map(([g,n])=>({g,n})),lvMax(l,[[1,3],[6,4],[11,5],[17,6]]),'Auf Stufe 1 je ein Anschlag, eine Hetze und ein Riss.'),
-      h('div',{class:'label',style:'margin:8px 0 6px'},'Jagdbuch'),jagdbuchDoc(c,true));break}
+      h('p',{class:'note'},'Dein Jagdbuch steht im Reiter „Jagdbuch“.'));break}
     case 'sohei':{const used=(d.weg||[]).length+(d.optB||0);box.append(pickRow(c,'weg','Der eigene Weg · Option A',SOHEI_WEG.map(n=>({n})),Math.max(0,oddCount(l)-(d.optB||0)),`Auf jeder ungeraden Stufe eine Wahl: ${used} von ${oddCount(l)} getroffen.`),
       h('div',{style:'margin-bottom:16px'},h('div',{class:'label'},'Option B · Mehr Kapazität (+5 je Wahl)'),h('div',{class:'row',style:'display:flex;gap:8px;align-items:center;margin-top:6px'},h('button',{class:'btn ghost small',type:'button',disabled:!(d.optB>0),onclick:()=>decSet('optB',Math.max(0,(d.optB||0)-1))},'−'),h('b',{},d.optB||0),h('button',{class:'btn ghost small',type:'button',disabled:used>=oddCount(l),onclick:()=>decSet('optB',(d.optB||0)+1)},'+'))));break}
     case 'schreinpriester':{const maxTier=lvMax(l,[[1,1],[5,2],[9,3],[13,4],[17,5]]);const rows=d.talismane||[];const used=rows.length+rows.reduce((s,r)=>s+(+r.verb||0),0);
       box.append(listRow(c,'talismane','Talismane',[{k:'name',l:'Talisman',opts:TALIS.filter(([t])=>t<=maxTier).map(([t,n])=>n)},{k:'verb',l:'Verbesserungen',num:true,min:0,max:5}],null,`Talisman-Wahlen: ${used} von ${oddCount(l)} (jede ungerade Stufe: neuer Talisman oder eine Verbesserung). Verfügbar bis Tier ${maxTier}.`),
         listRow(c,'geister','Bekannte Geister',[{k:'name',l:'Name',wide:true},{k:'schrein',l:'Schrein'}],null,'Geisternamen sammelst du mit einem Ritus an einem nicht verdorbenen Schrein (ab Stufe 6).'));break}
     case 'kamikagari':{const maxR=lvMax(l,[[1,1],[4,2],[6,3],[8,4],[10,5],[12,6],[14,7],[16,8],[18,9],[20,10]]);const maxG=lvMax(l,[[1,1],[5,2],[10,3],[15,4],[20,5]]);const rows=d.goetter||[];
-      box.append(listRow(c,'goetter','Götter',[{k:'gott',l:'Gott',opts:GODS.filter(([s])=>s<=l).map(([s,n])=>n)},{k:'rang',l:'Social Link',num:true,min:1,max:maxR}],maxG,`Neue Götter auf den Stufen 1, 5, 10, 15 und 20. Höchster Rang auf deiner Stufe: ${maxR}. Steigern nur am Schrein, höchstens 2 Ränge pro Aufenthalt.`),
-        choiceRow(c,'kanal','Kanalisiert',rows.map(r=>r.gott).filter(Boolean),'Wechsel als Bonus Action. Die erste passive Fähigkeit jedes Gottes wirkt immer.'),
-        listRow(c,'tabus','Gebrochene Tabus',[{k:'gott',l:'Gott'},{k:'was',l:'Was passiert ist',wide:true}],null));break}
+      box.append(choiceRow(c,'kanal','Kanalisiert',rows.map(r=>r.gott).filter(Boolean),'Wechsel als Bonus Action. Die erste passive Fähigkeit jedes Gottes wirkt immer.'),h('p',{class:'note'},'Götter, Social Links und gebrochene Tabus stehen im Reiter „Social Links“.'));break}
     case 'onmyoji':{box.append(choiceRow(c,'schule','Schule',['Das Rad','Wheelbreaker','Enchanter'],'Einmal auf Stufe 1, für immer.'));if(d.schule==='Enchanter'&&l>=5){const tr=d.enchTausch||[];box.append(h('div',{style:'margin-bottom:16px'},h('div',{class:'label',style:'margin-bottom:6px'},'Enchanter · +1d-Würfel gegen Verzauberung getauscht auf Stufe'),h('div',{class:'pick'},[5,9,13,17].filter(x=>l>=x).map(x=>{const on=tr.includes(x);return h('button',{class:'pill',type:'button','aria-pressed':String(on),onclick:()=>decSet('enchTausch',on?tr.filter(y=>y!==x):[...tr,x])},'Stufe '+x)}))))}
       if(d.schule!=='Wheelbreaker'){const ptr=d.zeiger||'Kū';const fl=d.fluss||0;const flMax=lvMax(l,[[1,2],[3,3],[7,4],[11,5]]);const i=ELEM.indexOf(ptr);const blocked=c.corr&&l<18;
         const move=(steps,keep)=>{upd(c=>{R_(c);c.dec.zeiger=ELEM[(i+steps+6)%6];c.dec.fluss=keep?Math.min(flMax,(c.dec.fluss||0)+1):0})};
@@ -1524,7 +1535,7 @@ function viewClass(c){R_(c);const l=c.level,m=mods(c),d=c.dec,w=h('div');const c
       box.append(h('p',{class:'note'},`Zusätzliche Reactions pro Runde: ${lvMax(l,[[1,0],[11,1],[17,2]])}.`));break}
   }
   w.append(sec(C[c.classId].kanji.slice(0,1),'Deine '+C[c.classId].name+'-Entscheidungen',box));
-  const xw=c.dec.xweap||[];w.append(sec('添','Weitere Waffen-Proficiencies',h('p',{class:'note'},'Zum Beispiel aus deiner Rasse (Tengu: eine Waffe deiner Wahl) oder einer Lehre.'),h('div',{class:'pick'},DATA.items.filter(i=>i.cat==='Waffe').map(i=>{const on=xw.includes(i.n);return h('button',{class:'pill',type:'button','aria-pressed':String(on),onclick:()=>decSet('xweap',on?xw.filter(x=>x!==i.n):[...xw,i.n])},i.n)}))));
+  const xw=c.dec.xweap||[];w.append(sec('添','Weitere Waffen-Proficiencies',h('p',{class:'note'},'Zum Beispiel aus einer Lehre. Waffen, für die du Weapon Mastery hast (Tengu), zählen automatisch als proficient.'),h('div',{class:'pick'},DATA.items.filter(i=>i.cat==='Waffe').map(i=>{const on=xw.includes(i.n);return h('button',{class:'pill',type:'button','aria-pressed':String(on),onclick:()=>decSet('xweap',on?xw.filter(x=>x!==i.n):[...xw,i.n])},i.n)}))));
   return w}
 
 function armorOpts(cid){const t=(C[cid].basics['Armor Proficiencies']||'').split('(')[0].split(',')[0];if(!/ oder /.test(t))return null;return t.split(' oder ').map(s=>s.trim()).map(s=>s[0].toUpperCase()+s.slice(1))}
@@ -1587,14 +1598,14 @@ function viewRules(c){const cl=C[c.classId],r=R[c.raceId];const w=h('div');
   const bas=h('details',{},h('summary',{},'Grundlagen'),renderLines(Object.entries(cl.basics).map(([k,v])=>k+': '+v)));cr.append(bas);
   for(const s of cl.rules){const sc=SCHOOLS.find(n=>s.h.startsWith(n));if(sc&&!schoolsOf(c).includes(sc))continue;cr.append(h('details',{},h('summary',{},s.h),renderLines(s.body)))}
   const tb=h('details',{},h('summary',{},'Stufenübersicht'));const t=h('table');t.append(h('tr',{},h('th',{},'Stufe'),h('th',{},'Meilenstein')));for(let i=1;i<=20;i++)t.append(h('tr',{},h('td',{},i),h('td',{},cl.milestones[i]||'—')));tb.append(h('div',{class:'tblw'},t));for(const n of cl.msnotes||[])tb.append(h('p',{class:'note'},n));cr.append(tb);
-  w.append(sec(cl.kanji.slice(0,1),'Klasse: '+cl.name,cr));
+  w.append(foldSec('klasse',cl.kanji.slice(0,1),'Klasse: '+cl.name,cr));
   const rr=h('div');rr.append(h('p',{class:'note'},r.attr));for(const x of r.extra||[])rr.append(h('p',{class:'note'},x));
   for(const lv of Object.keys(r.levels).sort((a,b)=>a-b))rr.append(h('details',{open:+lv<=c.level?true:null},h('summary',{},'Stufe '+lv+(+lv>c.level?' · noch nicht erreicht':'')),renderLines(r.levels[lv].map(x=>x.h?'## '+x.h:x.t))));
-  w.append(sec(r.kanji.slice(0,1)||'種','Rasse: '+r.name,rr));
+  w.append(foldSec('rasse',r.kanji.slice(0,1)||'種','Rasse: '+r.name,rr));
   if(isYokai(c)){const mm=h('div');mm.append(h('p',{class:'note'},'Jeder Yokai führt neben seiner Klasse eine zweite Spur. Auf den Stufen 3, 6, 10, 14 und 18 knüpfst du ein Band zu einem benannten Menschen und wählst eine Lehre. Stirbt ein Mensch, zu dem du ein Band hast, erhältst du die Lehre Trauer.'));
     for(const[key,title]of[['nigi','Nigimitama — was man von Menschen lernt'],['ara','Aramitama — was man wird, wenn man gefürchtet wird']]){const t=h('table');t.append(h('tr',{},h('th',{},'Lehre'),h('th',{},'Wirkung')));for(const[n,x]of DATA.mitama[key])t.append(h('tr',{},h('td',{},h('b',{},n)),h('td',{},x)));mm.append(h('details',{},h('summary',{},title),h('div',{class:'tblw'},t)))}
     mm.append(h('details',{},h('summary',{},'Trauer'),h('p',{},DATA.mitama.trauer)));
-    w.append(sec('魂','Mitama',mm))}
+    w.append(foldSec('mitama','魂','Mitama',mm))}
   return w}
 
 /* party */
