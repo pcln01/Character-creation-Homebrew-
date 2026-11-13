@@ -80,9 +80,9 @@ h1,h2,h3{font-family:var(--f-disp);text-wrap:balance;margin:0;font-weight:700}
 .lvl{text-align:center}
 .lvl .n{font-family:var(--f-disp);font-size:44px;font-weight:800;line-height:1;color:var(--shu)}
 .lvl .l{font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:var(--sumi-3)}
-.tabs{display:flex;flex-wrap:wrap;gap:2px;margin-top:18px;border-bottom:1px solid var(--line)}
+.tabs{display:flex;flex-wrap:wrap;gap:0;margin-top:18px;border-bottom:1px solid var(--line)}
 @media (max-width:700px){.tabs{flex-wrap:nowrap;overflow-x:auto}}
-.tab{background:none;border:0;padding:10px 8px;cursor:pointer;color:var(--sumi-3);font-weight:700;border-bottom:2px solid transparent;white-space:nowrap;display:flex;gap:8px;align-items:baseline}
+.tab{background:none;border:0;padding:10px 5px;cursor:pointer;color:var(--sumi-3);font-weight:700;border-bottom:2px solid transparent;white-space:nowrap;display:flex;gap:5px;align-items:baseline}
 .tab .k{font-family:var(--f-disp);font-size:13px;color:var(--sumi-3)}
 .tab[aria-selected="true"]{color:var(--sumi);border-bottom-color:var(--shu)}
 .tab[aria-selected="true"] .k{color:var(--shu)}
@@ -271,7 +271,13 @@ let store={mode:'local',db:null,user:null,uid:null,ref:null,writing:false,dirty:
 
 function score(c,a){let s=(+c.base[a]||0)+(R[c.raceId].bonus[a]||0);if((c.raceChoice||[]).includes(a))s+=1;for(const L of c.levels||[])s+=(L.asi&&L.asi[a])||0;if(c.classId==='hanyo'&&c.dec?.backAsi===a&&hanyoGrad(c).back>=2)s=Math.min(20,s+1);return s}
 function mods(c){return Object.fromEntries(AB.map(a=>[a,mod(score(c,a))]))}
-function lehren(c){return (c.bonds||[]).map(b=>b.lehre).filter(Boolean)}
+function lehren(c){return [...(c.bonds||[]).map(b=>b.lehre).filter(Boolean),...((c.bonds||[]).some(b=>b.tot)?['Trauer']:[])]}
+const MITAMA_ST=[[4,'Nigimitama III','„Er ist einer von uns.“ Sie meinen es wörtlich.'],[2,'Nigimitama II','„Man vergisst manchmal, was er ist.“'],[1,'Nigimitama I','„Er ist anders als die anderen.“'],[0,'Mitte','„Man weiß nie so recht bei ihm.“'],[-1,'Aramitama I','„Man geht ihm besser aus dem Weg.“'],[-3,'Aramitama II','„Die Kinder werden hineingeholt, wenn er kommt.“'],[-5,'Aramitama III','Sie sagen deinen Namen nicht mehr laut.']];
+function mitamaVal(c){return Math.max(-5,Math.min(5,Math.round(+ovOf(c).mitama||0)))}
+function mitamaStage(v){return MITAMA_ST.find(x=>v>=x[0])||MITAMA_ST[MITAMA_ST.length-1]}
+function mitamaSide(c){const v=mitamaVal(c);return v>0?'nigi':v<0?'ara':'mitte'}
+function lehreOk(c,key){const s=mitamaSide(c);return s==='mitte'||s===key}
+const SIDE_TXT={nigi:'Nigimitama',ara:'Aramitama',mitte:'in der Mitte'};
 function hpMax(c){const cl=C[c.classId];const m=mods(c).con;let hp=cl.hd;for(const L of c.levels||[])hp+=+L.hp||0;hp+=c.level*m;if(c.raceId==='mensch')hp+=c.level;if(lehren(c).includes('Der ungebrochene Leib'))hp+=2*c.level;if(c.classId==='hanyo')hp-=5*c.level*hanyoGrad(c).leb;return Math.max(1,hp)*(c.nio?Math.pow(2,c.nio):1)}
 function soulMax(c){const m=mods(c);return Math.max(1,2+c.level+AB.reduce((t,a)=>t+m[a],0)-(c.classId==='hanyo'?5*hanyoGrad(c).seele:0))*(c.nio?Math.pow(2,c.nio):1)}
 function acOf(c){const d=mods(c).dex;const eq=(c.inv||[]).filter(i=>i.equipped&&i.armor);let body=eq.find(i=>['light','medium','heavy'].includes(i.armor.type));let ac;
@@ -328,12 +334,12 @@ function render(){renderRoster();const m=$('#main');m.textContent='';
   if(S.party){m.append(viewParty());return}
   const c=cur();if(!c){m.append(viewEmpty());return}
   m.append(viewHead(c));
-  const tabs=[['sheet','Bogen','書'],['fight','Kampf','戦'],['class','Klasse','流'],...(c.classId==='yokaihunter'?[['book','Jagdbuch','冊']]:c.classId==='kamikagari'?[['links','Social Links','絆']]:[]),['grow','Aufstieg','成長'],['inv','Inventar','持物'],['rules','Regeln','巻']];if(!tabs.some(t=>t[0]===S.tab))S.tab='sheet';
+  const tabs=[['sheet','Bogen','書'],['fight','Kampf','戦'],['class','Klasse','流'],...(c.classId==='yokaihunter'?[['book','Jagdbuch','冊']]:c.classId==='kamikagari'?[['links','Social Links','絆']]:[]),...(isYokai(c)?[['mitama','Mitama','魂']]:[]),['grow','Aufstieg','成長'],['inv','Inventar','持物'],['rules','Regeln','巻']];if(!tabs.some(t=>t[0]===S.tab))S.tab='sheet';
   const tl=h('div',{class:'tabs',role:'tablist'});
   for(const[k,l,kj]of tabs)tl.append(h('button',{class:'tab',role:'tab','aria-selected':String(S.tab===k),type:'button',onclick:()=>{S.tab=k;render()}},h('span',{class:'k'},kj),l));
   m.append(tl);
   const p=h('div',{class:'panel',role:'tabpanel'});
-  p.append(S.tab==='sheet'?viewSheet(c):S.tab==='fight'?viewCombat(c):S.tab==='class'?viewClass(c):S.tab==='book'?viewBook(c):S.tab==='links'?viewLinks(c):S.tab==='grow'?viewGrow(c):S.tab==='inv'?viewInv(c):viewRules(c));m.append(p)}
+  p.append(S.tab==='sheet'?viewSheet(c):S.tab==='fight'?viewCombat(c):S.tab==='class'?viewClass(c):S.tab==='book'?viewBook(c):S.tab==='links'?viewLinks(c):S.tab==='mitama'?viewMitama(c):S.tab==='grow'?viewGrow(c):S.tab==='inv'?viewInv(c):viewRules(c));m.append(p)}
 
 function renderRoster(){const r=$('#roster');r.textContent='';
   for(const c of S.chars){const cl=C[c.classId];r.append(h('button',{class:'rbtn',type:'button','aria-current':String(!S.party&&!S.dm&&c.id===S.sel),onclick:()=>{S.sel=c.id;S.party=false;S.dm=false;render()}},
@@ -409,7 +415,6 @@ function viewGrow(c){const w=h('div');const next=c.level+1;
     w.append(sec('昇','Nächste Stufe: '+next,box,h('button',{class:'btn',type:'button',onclick:()=>openLevelUp(c)},'Auf Stufe '+next+' aufsteigen')))}
   else w.append(sec('極','Stufe 20 erreicht',h('p',{class:'note'},'Mehr Stufen gibt es nicht.')));
   if((c.levels||[]).length)w.append(h('div',{style:'margin:-10px 0 24px 48px'},h('button',{class:'btn ghost small',type:'button',onclick:()=>undoLevel(c)},'Letzten Aufstieg rückgängig')));
-  if(isYokai(c)&&(c.bonds||[]).length){const bl=h('div');for(const b of c.bonds)bl.append(h('div',{class:'feat'},h('div',{},h('span',{class:'lv'},'Stufe '+b.level),h('span',{class:'src'},'Band')),h('p',{},h('b',{},b.name||'—'),' · Lehre: ',b.lehre||'—')));w.append(sec('絆','Bande',bl))}
   const hist=h('div');for(let lv=c.level;lv>=1;lv--){for(const f of featuresAt(c,lv)){const d=h('div',{class:'feat'},h('div',{},h('span',{class:'lv'},'Stufe '+lv),h('span',{class:'src'},f.src)));d.append(renderLines(f.lines));hist.append(d)}}
   w.append(sec('歴','Was du bisher erreicht hast',hist));return w}
 function undoLevel(c){upd(c=>{const L=c.levels.pop();lvChoiceUndo(c,L);c.level=Math.max(1,c.level-1);if(L&&L.bond)c.bonds=(c.bonds||[]).filter(b=>b.level!==L.lv);c.hp=Math.min(c.hp,hpMax(c));c.soul=Math.min(c.soul,soulMax(c))});toast('Aufstieg zurückgenommen')}
@@ -428,11 +433,11 @@ function openLevelUp(c){const cl=C[c.classId];const next=c.level+1;const LC=lvCh
       h('div',{class:'pick'},h('button',{class:'pill',type:'button','aria-pressed':String(st.asiMode==='two'),onclick:()=>{st.asiMode='two';draw()}},'+1 auf zwei'),h('button',{class:'pill',type:'button','aria-pressed':String(st.asiMode==='one'),onclick:()=>{st.asiMode='one';draw()}},'+2 auf eins')),
       h('div',{class:'addrow'},abSel('a1',st,draw,c),st.asiMode==='two'?abSel('a2',st,draw,c):null),h('p',{class:'note'},'Kein Wert über 20.'))}
     if(bondLv){const side=h('div',{class:'grid2'});
-      for(const[key,title]of[['nigi','Nigimitama'],['ara','Aramitama']]){const col=h('div',{},h('div',{class:'label'},title));for(const[n,t]of DATA.mitama[key]){const taken=lehren(c).includes(n);col.append(h('button',{class:'catb',type:'button',style:'width:100%;margin-top:6px','aria-pressed':String(st.lehre===n),disabled:taken,onclick:()=>{st.lehre=n;draw()}},h('b',{},n+(st.lehre===n?' ✓':'')+(taken?' (schon gewählt)':'')),h('small',{},t)))}side.append(col)}
+      for(const[key,title]of[['nigi','Nigimitama'],['ara','Aramitama']]){const col=h('div',{},h('div',{class:'label'},title));const ok=lehreOk(c,key);for(const[n,t]of DATA.mitama[key]){const taken=lehren(c).includes(n);col.append(h('button',{class:'catb',type:'button',style:'width:100%;margin-top:6px'+(ok?'':';opacity:.45'),'aria-pressed':String(st.lehre===n),disabled:taken||!ok,onclick:()=>{st.lehre=n;draw()}},h('b',{},n+(st.lehre===n?' ✓':'')+(taken?' (schon gewählt)':'')),h('small',{},t)))}side.append(col)}
       const nm=h('input',{id:'bondName',placeholder:'Name des Menschen',value:st.bondName});nm.addEventListener('input',()=>{st.bondName=nm.value});const kn=(c.names||[]).filter(x=>x.name);
-      d.append(h('h3',{style:'margin-top:18px;font-size:18px'},'Band knüpfen'),h('p',{class:'note'},'Benenne einen Menschen, der dich kennt. Du wählst die Lehre nur von der Seite, auf der deine Waage gerade steht; in der Mitte aus beiden. Frag den Spielleiter, welche Seite gilt.'),h('div',{class:'field'},nm),kn.length?h('div',{class:'pick',style:'margin:-4px 0 12px'},kn.map(x=>h('button',{class:'pill',type:'button','aria-pressed':String(st.bondName===x.name),onclick:()=>{st.bondName=x.name;draw()}},x.name))):null,side)}
+      d.append(h('h3',{style:'margin-top:18px;font-size:18px'},'Band knüpfen'),h('p',{class:'note'},'Benenne einen Menschen, der dich kennt. Deine Waage steht '+(mitamaSide(c)==='mitte'?'in der Mitte: Du wählst aus beiden Seiten.':'auf '+SIDE_TXT[mitamaSide(c)]+': Du wählst nur von dieser Seite.')),h('div',{class:'field'},nm),kn.length?h('div',{class:'pick',style:'margin:-4px 0 12px'},kn.map(x=>h('button',{class:'pill',type:'button','aria-pressed':String(st.bondName===x.name),onclick:()=>{st.bondName=x.name;draw()}},x.name))):null,side)}
     if(LC)d.append(LC.ui(st,draw));
-    const ok=st.hp&&(!asi||(st.a1&&(st.asiMode==='one'||(st.a2&&st.a2!==st.a1))))&&(!LC||LC.valid(st));
+    const lfree=bondLv&&['nigi','ara'].some(k=>lehreOk(c,k)&&DATA.mitama[k].some(([n])=>!lehren(c).includes(n)));const ok=st.hp&&(!asi||(st.a1&&(st.asiMode==='one'||(st.a2&&st.a2!==st.a1))))&&(!LC||LC.valid(st))&&(!lfree||!!st.lehre);
     d.append(h('div',{class:'foot'},h('button',{class:'btn ghost',type:'button',onclick:closeModal},'Abbrechen'),h('button',{class:'btn',type:'button',disabled:!ok,onclick:()=>{
       upd(c=>{const L={lv:next,hp:st.hp};c.dec=c.dec||{};if(LC)LC.apply(c,st,L);if(asi){L.asi={};if(st.asiMode==='one')L.asi[st.a1]=2;else{L.asi[st.a1]=1;L.asi[st.a2]=1}}
         if(bondLv){L.bond=true;c.bonds=[...(c.bonds||[]),{level:next,name:st.bondName,lehre:st.lehre}]}
@@ -1190,7 +1195,10 @@ function dropsPane(c,o,set,src){const w=h('div');
   return w}
 function dmTools(c,src){const o=JSON.parse(JSON.stringify(ovOf(c)));const set=fn=>{fn(o);saveOverlay(c,o,src)};const w=h('div');
   const fc=forceControls(c,subOf(c),v=>set(o=>{if(v){o.sub=v.sub;if(v.stufe)o.stufe=v.stufe;else delete o.stufe}else{o.sub=null;delete o.stufe}}));if(fc)w.append(card('進 Unterrasse',fc));
-  const cv=clanOf(c);w.append(card('家 Clan',h('div',{class:'pick'},[['Ōtomo','Ōtomo'],['Kume','Kume'],['keine','Keine Clan-Angehörigkeit']].map(([v,l])=>h('button',{class:'pill',type:'button',id:'clan-'+v,'aria-pressed':String(cv===v),onclick:()=>set(o=>{o.clan=v})},l))),NOTE('Gilt sofort für Bogen, PDF und Gruppenansicht. Das Inventar bleibt unverändert.')));
+  if(isYokai(c)){const mv=mitamaVal(c);const st=mitamaStage(mv);const setM=v=>set(o=>{o.mitama=Math.max(-5,Math.min(5,v))});
+    w.append(card('魂 Mitama-Waage · nur für dich',h('div',{class:'addrow',style:'align-items:center;flex-wrap:wrap'},sbtn('− Aramitama',()=>setM(mv-1),{id:'mitamaDown',disabled:mv<=-5}),h('b',{style:'font-size:22px;min-width:44px;text-align:center',id:'mitamaVal'},(mv>0?'+':mv<0?'−':'')+Math.abs(mv)),sbtn('Nigimitama +',()=>setM(mv+1),{id:'mitamaUp',disabled:mv>=5}),mv?sbtn('auf 0',()=>setM(0)):null),
+      h('p',{style:'margin:6px 0 0'},h('b',{},st[1]+' · '),st[2]),NOTE('Der Spieler sieht nur die Seite (Nigimitama, Mitte, Aramitama) und darf beim nächsten Band nur Lehren dieser Seite wählen, in der Mitte aus beiden. Die Zahl und die Stufe sieht er nicht.')))}
+  const cv=clanOf(c);w.append(card('家 Clan',h('div',{class:'pick'},[['Ōtomo','Ōtomo'],['Kume','Kume'],['keine','Keine Clan-Angehörigkeit']].map(([v,l])=>h('button',{class:'pill',type:'button',id:'clan-'+v,'aria-pressed':String(cv===v),onclick:()=>set(o=>{o.clan=v})},l))),NOTE('Gilt sofort für Bogen, PDF und Gruppenansicht. Beim Spieler wird die Clan-Kleidung im Inventar mitgetauscht.')));
   const isel=h('select',{id:'giveItem','aria-label':'Item aus dem Katalog'},h('option',{value:''},'Aus dem Katalog …'),DATA.items.map(i=>h('option',{value:i.n},i.n+' ('+i.cat+')')));
   const iname=h('input',{id:'giveName',placeholder:'oder eigenes Item: Name'}),idesc=h('input',{id:'giveDesc',placeholder:'Beschreibung / Wirkung',style:'flex:1;min-width:200px'}),iw=nIn('giveW',0,0,999,64),iq=nIn('giveQ',1,1,99,56);
   isel.addEventListener('change',()=>{const cat=ITEM[isel.value];if(cat){iname.value='';iw.value=cat.w||0;idesc.placeholder=cat.d||'Beschreibung / Wirkung'}});iname.addEventListener('input',()=>{const w=catW(iname.value);if(w)iw.value=w});
@@ -1476,6 +1484,20 @@ function listRow(c,k,label,fields,limit,note){const rows=(c.dec||{})[k]||[];cons
   wrap.append(tb,h('button',{class:'btn ghost small',type:'button',style:'margin-top:8px',disabled:limit!=null&&rows.length>=limit,onclick:()=>upd(c=>{R_(c);c.dec[k]=[...(c.dec[k]||[]),{}]})},'＋ Eintrag'));
   if(note)wrap.append(h('p',{class:'note'},note));return wrap}
 
+function lehreText(n){if(n==='Trauer')return DATA.mitama.trauer;const x=[...DATA.mitama.nigi,...DATA.mitama.ara].find(y=>y[0]===n);return x?x[1]:''}
+function lehreSide(n){return DATA.mitama.nigi.some(y=>y[0]===n)?'Nigimitama':DATA.mitama.ara.some(y=>y[0]===n)?'Aramitama':''}
+function viewMitama(c){const w=h('div');const sd=mitamaSide(c);const bonds=c.bonds||[];const own=lehren(c);
+  w.append(sec('魂','Deine Waage',h('div',{class:'vitals',style:'grid-template-columns:repeat(3,minmax(0,1fr))'},...[['nigi','Nigimitama','Du wählst Lehren nur aus Nigimitama.'],['mitte','Mitte','Du wählst aus beiden Seiten.'],['ara','Aramitama','Du wählst Lehren nur aus Aramitama.']].map(([k,l,t])=>h('div',{class:'vital',style:k===sd?'outline:2px solid var(--shu)':'opacity:.5'},h('div',{class:'label'},k===sd?'Jetzt':'\u00a0'),h('div',{class:'big',style:'font-size:22px'},l),h('p',{class:'note'},t)))),
+    NOTE('Der Spielleiter führt die Waage verdeckt. Sie verschiebt sich nach dem, was Zeugen über dich denken. Was niemand sieht, verschiebt nichts.')));
+  const bl=h('div');
+  if(!bonds.length)bl.append(NOTE('Noch kein Band. Bande knüpfst du beim Aufstieg auf den Stufen 3, 6, 10, 14 und 18.'));
+  bonds.forEach((b,i)=>{const pick=!b.lehre?h('div',{style:'margin-top:8px'},h('div',{class:'label'},'Lehre wählen'),h('div',{class:'pick'},['nigi','ara'].filter(k=>lehreOk(c,k)).flatMap(k=>DATA.mitama[k]).filter(([n])=>!own.includes(n)).map(([n,t])=>h('button',{class:'pill',type:'button',title:t,onclick:()=>upd(c=>{c.bonds[i].lehre=n})},n)))):null;
+    const dead=h('label',{style:'display:flex;gap:6px;align-items:center;margin-top:6px'},(()=>{const x=h('input',{type:'checkbox',id:'bond-tot-'+i});x.checked=!!b.tot;x.addEventListener('change',()=>upd(c=>{c.bonds[i].tot=x.checked}));return x})(),'Dieser Mensch ist gestorben');
+    bl.append(h('div',{class:'feat'},h('div',{class:'addrow',style:'align-items:center;flex-wrap:wrap'},h('span',{class:'lv'},'Stufe '+b.level),h('b',{},b.name||'Ohne Namen'),b.tot?h('span',{class:'chip shu'},'verstorben'):null,b.lehre?h('span',{class:'chip'},lehreSide(b.lehre)):null),
+      b.lehre?h('p',{style:'margin:6px 0 0'},h('b',{},b.lehre+': '),lehreText(b.lehre)):null,pick,dead))});
+  w.append(sec('絆','Bande und Lehren',bl));
+  if(own.includes('Trauer'))w.append(sec('喪','Trauer',h('p',{},DATA.mitama.trauer),NOTE('Gilt unabhängig von deiner Waage. Sag dem Spielleiter Bescheid: Der Tod eines Bandes verschiebt die Waage um 1 nach Nigimitama.')));
+  return w}
 function viewBook(c){return h('div',{},sec('冊','Jagdbuch',jagdbuchDoc(c,false)))}
 function viewLinks(c){R_(c);const l=c.level,d=c.dec;const maxR=lvMax(l,[[1,1],[4,2],[6,3],[8,4],[10,5],[12,6],[14,7],[16,8],[18,9],[20,10]]);const maxG=lvMax(l,[[1,1],[5,2],[10,3],[15,4],[20,5]]);const rows=d.goetter||[];
   const w=h('div');w.append(sec('絆','Götter und Social Links',listRow(c,'goetter','Götter',[{k:'gott',l:'Gott',opts:GODS.filter(([s])=>s<=l).map(([s,n])=>n)},{k:'rang',l:'Social Link',num:true,min:1,max:maxR}],maxG,`Neue Götter auf den Stufen 1, 5, 10, 15 und 20. Höchster Rang auf deiner Stufe: ${maxR}. Steigern nur am Schrein, höchstens 2 Ränge pro Aufenthalt.`)));
