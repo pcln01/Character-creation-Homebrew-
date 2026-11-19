@@ -1557,7 +1557,7 @@ function viewCombat(c){R_(c);const m=mods(c),pb=prof(c.level),cl=C[c.classId];co
   const hdLeft=c.level-(c.hdUsed||0);
   w.append(sec('休','Rasten',h('div',{class:'addrow'},
     h('button',{class:'btn',type:'button',onclick:()=>openShortRest(c)},'Short Rest'),
-    h('button',{class:'btn',type:'button',onclick:()=>longRest(c)},'Long Rest'),
+    h('button',{class:'btn',type:'button',id:'lrBtn',onclick:()=>modal(d=>{d.append(h('h3',{},'Long Rest'),h('p',{class:'note'},'Wo rastest du? Soul HP kommen nur an einem nicht verdorbenen Ort zurück.'),h('div',{class:'addrow',style:'margin-top:12px;flex-wrap:wrap'},h('button',{class:'btn',type:'button',id:'lrClean',onclick:()=>{closeModal();longRest(c,true)}},'清 Reiner Ort'),h('button',{class:'btn ghost',type:'button',id:'lrCorrupt',onclick:()=>{closeModal();longRest(c,false)}},'穢 Verdorbener Ort'),h('button',{class:'btn ghost',type:'button',onclick:closeModal},'Abbrechen')))})},'Long Rest'),
     h('button',{class:'btn ghost',type:'button',onclick:()=>openShrine(c)},'⛩ Am Schrein')),
     h('p',{class:'note'},`Hit Dice: ${hdLeft} von ${c.level} (1d${cl.hd}). Long Rest: Hit Points und Soul HP voll, die Hälfte deiner Hit Dice kehrt zurück, Ressourcen mit „Long Rest“ füllen sich. Corruption bleibt und geht nur an einem Schrein weg.`)));
   /* corruption */
@@ -1602,8 +1602,8 @@ function openShortRest(c){const cl=C[c.classId];let st={n:0,res:null};const left
       const dice=st.n+(free?1:0);const parts=[];let heal=0;for(let i=0;i<dice;i++){const r=1+Math.floor(Math.random()*cl.hd);parts.push(r);heal+=Math.max(0,r+cm)}
       upd(c=>{afterShortRest(c);c.hdUsed=(c.hdUsed||0)+st.n;c.hp=Math.min(hpMax(c),(c.hp??hpMax(c))+heal);if(c.classId==='onmyoji'&&c.level>=18&&c.dec?.schule!=='Wheelbreaker'){R_(c);const mx=counters(c).find(x=>x.k==='siegel')?.max||0;c.res.siegel=Math.min(mx,resVal(c,'siegel',mx)+Math.floor(mx/2))}});
       closeModal();toast(dice?`Short Rest: +${heal} Hit Points (${parts.join(', ')})`:'Short Rest beendet')}},'Rasten')))};draw()})}
-function longRest(c){let lost=0;upd(c=>{R_(c);c.hp=hpMax(c);c.soul=soulMax(c);c.hdUsed=Math.max(0,(c.hdUsed||0)-Math.max(1,Math.floor(c.level/2)));
-  for(const x of counters(c))if(x.reset==='long')c.res[x.k]=x.max;afterLongRest(c);if(c.classId==='yokaihunter')lost=gmSpoil(c)});toast('Long Rest: Hit Points, Soul HP und Ressourcen aufgefüllt'+(lost?' · '+lost+' Gegenmittel verdorben':''));
+function longRest(c,clean){if(clean===undefined)clean=true;let lost=0;upd(c=>{R_(c);c.hp=hpMax(c);if(clean)c.soul=soulMax(c);c.hdUsed=Math.max(0,(c.hdUsed||0)-Math.max(1,Math.floor(c.level/2)));
+  for(const x of counters(c))if(x.reset==='long')c.res[x.k]=x.max;afterLongRest(c);if(c.classId==='yokaihunter')lost=gmSpoil(c)});toast('Long Rest: Hit Points'+(clean?', Soul HP':'')+' und Ressourcen aufgefüllt'+(clean?'':' · Soul HP bleiben (verdorbener Ort)')+(lost?' · '+lost+' Gegenmittel verdorben':''));
   const x=cur();if(x&&x.classId==='yokaihunter'&&x.level>=2&&(x.dec?.teile||[]).some(t=>t.n>0))openBrew(x,true)}
 function openShrine(c){modal(d=>{const kk=c.classId==='kamikagari';
   d.append(h('div',{class:'label'},'⛩ Nicht verdorbener Schrein'),h('h2',{},'Am Schrein'),h('p',{class:'note'},'Nur an einem nicht verdorbenen Schrein. Was du hier tun kannst:'));
