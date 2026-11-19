@@ -839,14 +839,14 @@ function priestCombat(c){const d=c.dec||{},l=c.level,pb=prof(l),m=mods(c);const 
 function kamiCombat(c){const d=c.dec||{},l=c.level;const w=h('div');const owned=(d.goetter||[]).filter(g=>g.gott&&DATA.gods[g.gott]);const maxR=lvMax(l,[[1,1],[4,2],[6,3],[8,4],[10,5],[12,6],[14,7],[16,8],[18,9],[20,10]]);
   const dp=resVal(c,'dp',l);const kan=d.kanal&&owned.find(g=>g.gott===d.kanal)?d.kanal:(owned[0]||{}).gott;
   if(!owned.length)return NOTE('Noch kein Gott eingetragen (Reiter „Social Links“).');
-  const pay=(n,label)=>upd(c=>{R_(c);const have=resVal(c,'dp',c.level);const fromDp=Math.min(have,n);c.res.dp=have-fromDp;const rest=n-fromDp;if(rest>0)c.soul=Math.max(0,(c.soul??soulMax(c))-rest);toast(label+': '+fromDp+' DP'+(rest?' + '+rest+' Soul HP':''))});
+  const pay=(n,label)=>upd(c=>{R_(c);const have=resVal(c,'dp',c.level);const fromDp=Math.min(have,n);c.res.dp=have-fromDp;const rest=n-fromDp;if(rest>0)c.soul=Math.max(0,(c.soul??soulMax(c))-2*rest);toast(label+': '+fromDp+' DP'+(rest?' + '+2*rest+' Soul HP':''))});
   w.append(card('神 Kanalisiert · Wechsel als Bonus Action',h('div',{class:'pick'},owned.map(g=>h('button',{class:'pill',type:'button','aria-pressed':String(kan===g.gott),onclick:()=>decSet('kanal',g.gott)},g.gott+' · Rang '+Math.min(+g.rang||1,maxR)))),h('p',{style:'margin:6px 0'},'Divinity Points: '+dp+' / '+l)));
   const g=owned.find(x=>x.gott===kan);const G=DATA.gods[kan];const rang=Math.min(+g.rang||1,maxR);
   const free=new Set();for(const r of G.ranks)if(r.r<=rang){const mm=r.t.match(/\(Rang (\d+)\) kostet keinen Divinity Point mehr/);if(mm)free.add(+mm[1])}
   const kl=h('div');for(const r of G.ranks){if(r.r>rang)continue;const nn=free.has(r.r)?0:(r.cost.match(/(\d+)\s*DP/)||[])[1];const all=/alle DP/.test(r.cost);
     kl.append(h('div',{class:'feat'},h('div',{class:'addrow',style:'align-items:center;flex-wrap:wrap'},h('span',{class:'lv'},'Rang '+r.r),h('b',{},r.t.split(':')[0]),h('span',{class:'chip'},free.has(r.r)?'kostenlos':r.cost||'—'),
       nn!=null&&!/passiv/.test(r.cost)?pbtn(+nn?'Anrufen (−'+nn+' DP)':'Anrufen',()=>{if(+nn)pay(+nn,r.t.split(':')[0]);else toast(r.t.split(':')[0])}):all?pbtn('Anrufen (alle DP: '+dp+' Runden)',()=>pay(dp,r.t.split(':')[0])):null),h('p',{class:'note',style:'margin:4px 0 0'},r.t)))}
-  w.append(card(kan+' · Rang '+rang+' · Tabu: '+G.tabu,kl,NOTE('Reichen die Divinity Points nicht, zahlst du den Rest mit Soul HP.')));
+  w.append(card(kan+' · Rang '+rang+' · Tabu: '+G.tabu,kl,NOTE('Reichen die Divinity Points nicht, zahlst du den Rest mit Soul HP: 2 Soul HP je fehlendem Divinity Point.')));
   const perm=owned.filter(x=>x.gott!==kan&&Math.min(+x.rang||1,maxR)>=2).map(x=>{const r=DATA.gods[x.gott].ranks.find(r=>/permanent/.test(r.cost));return r?h('p',{class:'note',style:'margin:2px 0'},h('b',{},x.gott+': '),r.t):null}).filter(Boolean);
   if(perm.length)w.append(card('Permanente erste Passiven anderer Götter',...perm));
   return w}
@@ -1477,7 +1477,7 @@ function counters(c){const l=c.level,pb=prof(l),m=mods(c),d=c.dec||{};const out=
       out.push({k:'bereit',l:'Talismane bereit',max:Math.max(1,m.wis+Math.floor(l/2)),reset:'long',n:'WIS-Modifikator + halbes Level, mindestens 1.'});
       if(l>=6)out.push({k:'geisterruf',l:'Geisterruf',max:l>=14?2:1,reset:'long',n:'Geist bis CR '+(l>=14?5:1)+'.'});
       if(l>=17){out.push({k:'seelenbruch',l:'Seelenbruch',max:1,reset:'long'});out.push({k:'saeule',l:'Säule des Feuers',max:1,reset:'long',n:'10d6 + WIS Radiant Damage.'})}break;
-    case 'kamikagari':out.push({k:'dp',l:'Divinity Points',max:l,reset:'shrine',n:'Füllen sich nur an einem nicht verdorbenen Schrein. Darüber hinaus zahlst du mit Soul HP.'});break;
+    case 'kamikagari':out.push({k:'dp',l:'Divinity Points',max:l,reset:'shrine',n:'Füllen sich nur an einem nicht verdorbenen Schrein. Darüber hinaus zahlst du mit Soul HP (2 je Divinity Point).'});break;
     case 'onmyoji':if(d.schule==='Wheelbreaker'){out.push({k:'slots',l:'Spell Slots',max:l,reset:'long'});out.push({k:'schmieden',l:'Schmieden auf gut Glück',max:1,reset:'long',n:'Einmal pro Long Rest beim Schmieden eines Gegenstands.'})}
       else out.push({k:'siegel',l:'Siegel',max:Math.max(1,m.int+Math.floor(l/2)),reset:'long',n:'INT-Modifier + halbes Level, mindestens 1. Formel eines anderen Elements: 1 Siegel.'+(l>=18?' Short Rest: halb zurück.':'')});break;
     case 'hanyo':out.push({k:'yoki',l:'Yōki',max:soulMax(c),reset:'none',n:'Höchstwert = max. Soul HP. Mit Corruption pro Zug im Kampf +'+Math.ceil(soulMax(c)/4)+'.',empty:true});if(hanyoGrad(c).back>=1)out.push({k:'back1',l:'Saving Throw wiederholen',max:1,reset:'long',n:'Zurückgefordert 1: einen misslungenen Saving Throw gegen frightened oder charmed wiederholen.'});break;
