@@ -842,13 +842,15 @@ function kamiCombat(c){const d=c.dec||{},l=c.level;const w=h('div');const owned=
   const pay=(n,label)=>upd(c=>{R_(c);const have=resVal(c,'dp',c.level);const fromDp=Math.min(have,n);c.res.dp=have-fromDp;const rest=n-fromDp;if(rest>0)c.soul=Math.max(0,(c.soul??soulMax(c))-2*rest);toast(label+': '+fromDp+' DP'+(rest?' + '+2*rest+' Soul HP':''))});
   w.append(card('神 Kanalisiert · Wechsel als Bonus Action',h('div',{class:'pick'},owned.map(g=>h('button',{class:'pill',type:'button','aria-pressed':String(kan===g.gott),onclick:()=>decSet('kanal',g.gott)},g.gott+' · Rang '+Math.min(+g.rang||1,maxR)))),h('p',{style:'margin:6px 0'},'Divinity Points: '+dp+' / '+l)));
   const g=owned.find(x=>x.gott===kan);const G=DATA.gods[kan];const rang=Math.min(+g.rang||1,maxR);
+  const gi=(d.goetter||[]).findIndex(x=>x.gott===kan);const setFrozen=v=>upd(c=>{R_(c);c.dec.goetter[gi].frozen=v});
+  const permOf=()=>{const pl=owned.filter(x=>x.gott!==kan&&!x.frozen&&Math.min(+x.rang||1,maxR)>=2).map(x=>{const r=DATA.gods[x.gott].ranks.find(r=>/permanent/.test(r.cost));return r?h('p',{class:'note',style:'margin:2px 0'},h('b',{},x.gott+': '),r.t):null}).filter(Boolean);if(pl.length)w.append(card('Permanente erste Passiven anderer Götter',...pl))};
+  if(g.frozen){w.append(card('✕ '+kan+' · Tabu gebrochen',NOTE('Der Social Link zu '+kan+' ist eingefroren. Du hast keinen Zugriff auf seine Fähigkeiten, bis du dich an einem Schrein rehabilitierst. Tabu: '+G.tabu),row(pbtn('Am Schrein rehabilitiert',()=>setFrozen(false)))));permOf();return w}
   const free=new Set();for(const r of G.ranks)if(r.r<=rang){const mm=r.t.match(/\(Rang (\d+)\) kostet keinen Divinity Point mehr/);if(mm)free.add(+mm[1])}
   const kl=h('div');for(const r of G.ranks){if(r.r>rang)continue;const nn=free.has(r.r)?0:(r.cost.match(/(\d+)\s*DP/)||[])[1];const all=/alle DP/.test(r.cost);
     kl.append(h('div',{class:'feat'},h('div',{class:'addrow',style:'align-items:center;flex-wrap:wrap'},h('span',{class:'lv'},'Rang '+r.r),h('b',{},r.t.split(':')[0]),h('span',{class:'chip'},free.has(r.r)?'kostenlos':r.cost||'—'),
       nn!=null&&!/passiv/.test(r.cost)?pbtn(+nn?'Anrufen (−'+nn+' DP)':'Anrufen',()=>{if(+nn)pay(+nn,r.t.split(':')[0]);else toast(r.t.split(':')[0])}):all?pbtn('Anrufen (alle DP: '+dp+' Runden)',()=>pay(dp,r.t.split(':')[0])):null),h('p',{class:'note',style:'margin:4px 0 0'},r.t)))}
-  w.append(card(kan+' · Rang '+rang+' · Tabu: '+G.tabu,kl,NOTE('Reichen die Divinity Points nicht, zahlst du den Rest mit Soul HP: 2 Soul HP je fehlendem Divinity Point.')));
-  const perm=owned.filter(x=>x.gott!==kan&&Math.min(+x.rang||1,maxR)>=2).map(x=>{const r=DATA.gods[x.gott].ranks.find(r=>/permanent/.test(r.cost));return r?h('p',{class:'note',style:'margin:2px 0'},h('b',{},x.gott+': '),r.t):null}).filter(Boolean);
-  if(perm.length)w.append(card('Permanente erste Passiven anderer Götter',...perm));
+  w.append(card(kan+' · Rang '+rang+' · Tabu: '+G.tabu,kl,NOTE('Reichen die Divinity Points nicht, zahlst du den Rest mit Soul HP: 2 Soul HP je fehlendem Divinity Point.'),row(sbtn('Tabu gebrochen',()=>setFrozen(true)))));
+  permOf();
   return w}
 
 /* ---------- Onmyōji ---------- */
