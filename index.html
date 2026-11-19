@@ -746,7 +746,7 @@ function gmBag(c){const d=c.dec||{};const w=h('div');const teile=d.teile||[];con
   w.append(h('div',{class:'label',style:'margin-top:14px'},'Gegenmittel · Action: einnehmen oder einem Verbündeten in Reichweite geben'+(c.level>=6?' · ab Stufe 6 zwei gleichzeitig':'')),gl,
     row(c.level>=2?pbtn('⚗ Brauen (Long Rest)',()=>openBrew(c),{id:'brewBtn'}):h('span',{class:'note'},'Brauen ab Stufe 2.')),
     NOTE('Brauen: Bei einem Long Rest so viele Gegenmittel wie dein Proficiency Bonus ('+prof(c.level)+'), sofern du Yokai-Teile hast. Sie verderben beim '+(c.level>=10?'übernächsten':'nächsten')+' Long Rest. Wird beim Long Rest automatisch angeboten.'),
-    PROP('Jedes Gegenmittel verbraucht 1 Yokai-Teil (abgeleitet aus „Zerlegen: Teile für zwei zusätzliche Gegenmittel“). Artgift braucht ein Teil der gewählten Art.'));
+    NOTE('Yokai-Teile sind die Yokai-Materialien aus den Drops. Jedes Gegenmittel kostet 1 Materialwert: Krallen, Zähne und Haut je 1, Fleisch 2. Trag die Teile als Materialwert ein. Artgift braucht ein Teil der gewählten Art.'));
   return w}
 function openBrew(c,fromRest){const d=c.dec||{};const pb=prof(c.level);let st={pick:{},art:{}};
   modal(dlg=>{const draw=()=>{dlg.textContent='';const teile=(d.teile||[]).filter(t=>t.n>0);const tot=teile.reduce((s,t)=>s+t.n,0);const chosen=Object.values(st.pick).reduce((s,n)=>s+n,0);
