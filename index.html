@@ -716,7 +716,7 @@ function yhCombat(c){const d=c.dec||{},m=mods(c),l=c.level,cb=CB(c);const w=h('d
     w.append(card('印 Male · Binden (Action)',NOTE(`Gebundene Kreaturen dieser Art können nicht fliehen, teleportieren, die Ebene wechseln, unsichtbar entkommen oder den Kampfort verlassen. Kein Saving Throw. Höchstens ${maxM} gleichzeitig; ein weiteres löst das älteste.`),
       iii.length?h('div',{class:'pick'},iii.map(a=>{const on=bound.includes(a);return h('button',{class:'pill',type:'button','aria-pressed':String(on),onclick:()=>cbUpd((c,cb)=>{let b=cb.mal||[];b=on?b.filter(x=>x!==a):[...b,a];while(b.length>maxM)b.shift();cb.mal=b})},a)})):NOTE('Noch kein Eintrag auf Tiefe III.')))}
   const kn=known.includes('Trophäe');if(kn&&cb.troph)w.append(card('Trophäe',NOTE(`Bis Kampfende +${Math.max(0,m.wis)} auf Angriffs- und Damage Rolls gegen „${cb.troph}“.`),row(sbtn('Beenden',()=>cbUpd((c,cb)=>{cb.troph=null})))));
-  const fk=d.fokus;if(fk&&l>=5)w.append(NOTE('Waffenfokus '+fk+': '+[[5,C.yokaihunter.milestones[5]],[11,C.yokaihunter.milestones[11]],[17,C.yokaihunter.milestones[17]]].filter(x=>l>=x[0]).map(x=>'Stufe '+x[0]+': '+x[1].split(';').filter(s=>/Waffenfokus/.test(s)).join('').trim()).join(' · ')+'. '+(fk==='Klinge'?'Klinge: '+(l>=17?'3 Angriffe pro Attack Action, dazu ein Zusatzangriff als Bonus Action.':l>=11?'3 Angriffe pro Attack Action.':'2 Angriffe pro Attack Action.'):'Bogen: Der genaue Effekt ist noch nicht festgelegt.')));
+  const fk=d.fokus;if(fk&&l>=5)w.append(NOTE('Waffenfokus '+fk+': '+[[5,C.yokaihunter.milestones[5]],[11,C.yokaihunter.milestones[11]],[17,C.yokaihunter.milestones[17]]].filter(x=>l>=x[0]).map(x=>'Stufe '+x[0]+': '+x[1].split(';').filter(s=>/Waffenfokus/.test(s)).join('').trim()).join(' · ')+'. '+(fk==='Klinge'?'Klinge: '+(l>=17?'3 Angriffe pro Attack Action, dazu ein Zusatzangriff als Bonus Action.':l>=11?'3 Angriffe pro Attack Action.':'2 Angriffe pro Attack Action.'):'Bogen: +'+(l>=17?3:l>=11?2:1)+'d6 Schaden pro Treffer mit der Fokuswaffe.')));
   return w}
 function openKill(c,bi){const b=c.cb.beute[bi];const d=c.dec;const zer=(d.griffe||[]).includes('Zerlegen');const lz=(d.griffe||[]).includes('Der letzte Atem');const tr=(d.griffe||[]).includes('Trophäe');
   let st={zer:zer,teile:zer?2:0,troph:tr};
@@ -737,6 +737,7 @@ function gmBag(c){const d=c.dec||{};const w=h('div');const teile=d.teile||[];con
     const a=h('input',{id:'teilart-'+i,value:t.art,'aria-label':'Art',style:'flex:1;min-width:120px'});a.addEventListener('change',()=>upd(c=>{c.dec.teile[i].art=a.value.trim()||'Unbekannt'}));
     tl.append(row(a,n,h('span',{class:'note'},'Teile'),sbtn('✕',()=>upd(c=>{c.dec.teile.splice(i,1)}),{'aria-label':'Teile entfernen'})))});
   if(!teile.length)tl.append(NOTE('Noch keine Yokai-Teile. Du bekommst sie von erlegter Beute (im Kampf „Beute erlegt“) oder trägst sie hier ein.'));
+  const im=invMats(c);if(im.length)tl.append(NOTE('Aus dem Inventar: '+im.map(x=>x.it.q+'× '+x.it.n+' = '+(x.per*x.it.q)+' Materialwert').join(' · ')));
   const sel=h('select',{id:'teilNeu','aria-label':'Art'},h('option',{value:''},'Art …'),(d.jagdbuch||[]).map(r=>r.art).filter(Boolean).map(a=>h('option',{value:a},a)));
   w.append(h('div',{class:'label'},'Yokai-Teile'),tl,row(sel,sbtn('＋ Teile hinzufügen',()=>upd(c=>{R_(c);const a=sel.value||'Unbekannt';const t=(c.dec.teile=c.dec.teile||[]);const r=t.find(y=>y.art===a);if(r)r.n++;else t.push({art:a,n:1})}))));
   const gl=h('div',{style:'margin-top:14px'});
@@ -746,11 +747,17 @@ function gmBag(c){const d=c.dec||{};const w=h('div');const teile=d.teile||[];con
   w.append(h('div',{class:'label',style:'margin-top:14px'},'Gegenmittel · Action: einnehmen oder einem Verbündeten in Reichweite geben'+(c.level>=6?' · ab Stufe 6 zwei gleichzeitig':'')),gl,
     row(c.level>=2?pbtn('⚗ Brauen (Long Rest)',()=>openBrew(c),{id:'brewBtn'}):h('span',{class:'note'},'Brauen ab Stufe 2.')),
     NOTE('Brauen: Bei einem Long Rest so viele Gegenmittel wie dein Proficiency Bonus ('+prof(c.level)+'), sofern du Yokai-Teile hast. Sie verderben beim '+(c.level>=10?'übernächsten':'nächsten')+' Long Rest. Wird beim Long Rest automatisch angeboten.'),
-    NOTE('Yokai-Teile sind die Yokai-Materialien aus den Drops. Jedes Gegenmittel kostet 1 Materialwert: Krallen, Zähne und Haut je 1, Fleisch 2. Trag die Teile als Materialwert ein. Artgift braucht ein Teil der gewählten Art.'));
+    NOTE('Yokai-Teile sind die Yokai-Materialien aus den Drops. Jedes Gegenmittel kostet 1 Materialwert: Krallen, Zähne und Haut je 1, Fleisch 2. Das Brauen nimmt sie direkt aus deinem Inventar, dazu die Teile aus der Liste oben (Materialwert). Artgift braucht ein Teil der gewählten Art.'));
   return w}
+function invMats(c){return (c.inv||[]).filter(it=>+it.q>0&&(it.mat||/Yokai-Material, \d+ je Stück/.test(it.d||''))).map(it=>{const per=(it.mat&&+it.mat.per)||+(((it.d||'').match(/Yokai-Material, (\d+) je Stück/)||[])[1])||1;const art=(it.mat&&it.mat.art)||(String(it.n).split(' · ')[1]||'Unbekannt').trim();return{it,per,art}})}
+function matPool(c){const m={};for(const t of (c.dec&&c.dec.teile)||[])if(t.n>0)m[t.art]=(m[t.art]||0)+t.n;for(const x of invMats(c))m[x.art]=(m[x.art]||0)+x.per*x.it.q;return Object.entries(m).map(([art,n])=>({art,n}))}
+function matTake(c,art,need){c.dec.teile=c.dec.teile||[];const arts=art?[art]:matPool(c).sort((a,b)=>b.n-a.n).map(x=>x.art);
+  for(const a of arts){if(need<=0)break;for(const t of c.dec.teile.filter(t=>t.art===a)){const x=Math.min(t.n,need);t.n-=x;need-=x}
+    for(const {it,per} of invMats(c).filter(x=>x.art===a)){while(need>0&&it.q>0){it.q--;if(per>need){const left=per-need;const r=c.dec.teile.find(t=>t.art===a);if(r)r.n+=left;else c.dec.teile.push({art:a,n:left});need=0}else need-=per}}}
+  c.dec.teile=c.dec.teile.filter(t=>t.n>0);c.inv=(c.inv||[]).filter(it=>+it.q>0)}
 function openBrew(c,fromRest){const d=c.dec||{};const pb=prof(c.level);let st={pick:{},art:{}};
-  modal(dlg=>{const draw=()=>{dlg.textContent='';const teile=(d.teile||[]).filter(t=>t.n>0);const tot=teile.reduce((s,t)=>s+t.n,0);const chosen=Object.values(st.pick).reduce((s,n)=>s+n,0);
-    dlg.append(h('div',{class:'label'},'⚗ Gegenmittel brauen'+(fromRest?' · Long Rest':'')),h('h2',{},'Was braust du?'),NOTE(`Höchstens ${pb} (Proficiency Bonus). Du hast ${tot} Yokai-Teile. Gewählt: ${chosen}.`));
+  modal(dlg=>{const draw=()=>{dlg.textContent='';const teile=matPool(c).filter(t=>t.n>0);const tot=teile.reduce((s,t)=>s+t.n,0);const chosen=Object.values(st.pick).reduce((s,n)=>s+n,0);
+    dlg.append(h('div',{class:'label'},'⚗ Gegenmittel brauen'+(fromRest?' · Long Rest':'')),h('h2',{},'Was braust du?'),NOTE(`Höchstens ${pb} (Proficiency Bonus). Du hast ${tot} Materialwert an Yokai-Teilen (Inventar und eigene Liste). Gewählt: ${chosen}.`));
     if(!tot){dlg.append(NOTE('Ohne Yokai-Teile kannst du nichts brauen.'),h('div',{class:'foot'},h('span'),h('button',{class:'btn',type:'button',onclick:closeModal},'Schließen')));return}
     for(const g of DATA.gegenmittel){const n=st.pick[g.n]||0;const isA=g.n==='Artgift';
       const artSel=isA?h('select',{id:'brew-art','aria-label':'Art für Artgift'},h('option',{value:''},'Art wählen …'),teile.map(t=>h('option',{value:t.art,selected:st.art.a===t.art},t.art+' ('+t.n+')'))):null;if(artSel)artSel.addEventListener('change',()=>{st.art.a=artSel.value;draw()});
@@ -758,10 +765,8 @@ function openBrew(c,fromRest){const d=c.dec||{};const pb=prof(c.level);let st={p
         sbtn('+',()=>{st.pick[g.n]=n+1;draw()},{'aria-label':g.n+' mehr',id:'brew+'+g.n,disabled:chosen>=pb||chosen>=tot||(isA&&(!st.art.a||n>=((teile.find(t=>t.art===st.art.a)||{}).n||0)))}),artSel),h('p',{class:'note',style:'margin:4px 0 0'},g.t)))}
     const ok=chosen>0&&(!(st.pick.Artgift>0)||st.art.a);
     dlg.append(h('div',{class:'foot'},h('button',{class:'btn ghost',type:'button',onclick:closeModal},fromRest?'Nicht brauen':'Abbrechen'),h('button',{class:'btn',type:'button',id:'brewOk',disabled:!ok,onclick:()=>{
-      upd(c=>{R_(c);const t=c.dec.teile;const take=(art,n)=>{const r=t.find(x=>x.art===art);r.n-=n};
-        if(st.pick.Artgift)take(st.art.a,st.pick.Artgift);
-        let rest=Object.entries(st.pick).filter(([k])=>k!=='Artgift').reduce((s,[,n])=>s+n,0);for(const r of [...t].sort((a,b)=>b.n-a.n)){const x=Math.min(r.n,rest);r.n-=x;rest-=x}
-        c.dec.teile=t.filter(x=>x.n>0);c.dec.gm=c.dec.gm||[];for(const[k,n]of Object.entries(st.pick))if(n>0)c.dec.gm.push({n:k,art:k==='Artgift'?st.art.a:'',q:n,life:gmLife(c)})});
+      upd(c=>{R_(c);if(st.pick.Artgift)matTake(c,st.art.a,st.pick.Artgift);
+        const rest=Object.entries(st.pick).filter(([k])=>k!=='Artgift').reduce((s,[,n])=>s+n,0);if(rest)matTake(c,null,rest);c.dec.gm=c.dec.gm||[];for(const[k,n]of Object.entries(st.pick))if(n>0)c.dec.gm.push({n:k,art:k==='Artgift'?st.art.a:'',q:n,life:gmLife(c)})});
       closeModal();toast('Gebraut: '+chosen+' Gegenmittel')}},'Brauen')))};draw()})}
 function gmSpoil(c){if(!c.dec||!c.dec.gm)return 0;let lost=0;for(const g of c.dec.gm)g.life--;c.dec.gm=c.dec.gm.filter(g=>{if(g.life<=0){lost+=g.q;return false}return true});return lost}
 
@@ -1162,7 +1167,7 @@ function armorFix(c,got){if(c.gearFix||!(+c.created<GEAR_SINCE)||!GEAR[c.classId
   const sh=pk.find(isShield);if(sh&&shieldOk(st)&&!(c.inv||[]).some(i=>i.armor&&i.armor.type==='shield')){addItem(c,ITEM[sh]);c.inv.find(i=>i.n===sh).equipped=true;add.push(sh)}
   if(add.length)got.push((c.name||'Charakter')+': Startrüstung '+add.join(', '))}
 function deliverDm(){const got=[];for(const c of S.chars){armorFix(c,got);const o=ovOf(c);const f=CLAN_FIX[c.id];if(f&&c.clan===f[0]&&o.clan===undefined)clanSync(c,{clan:f[1]},got);clanSync(c,o,got);for(const it of o.items||[]){c.dmGot=c.dmGot||[];if(c.dmGot.includes(it.id))continue;c.dmGot.push(it.id);
-      const x={id:uid(),n:it.n,d:(it.d?it.d+' · ':'')+'vom Spielleiter',q:+it.q||1,w:+it.w||catW(it.n),dm:true};if(it.armor)x.armor={...it.armor};if(!ITEM[it.n])x.custom=true;c.inv.push(x);got.push((c.name||'Charakter')+': '+it.n)}}
+      const x={id:uid(),n:it.n,d:(it.d?it.d+' · ':'')+'vom Spielleiter',q:+it.q||1,w:+it.w||catW(it.n),dm:true};if(it.armor)x.armor={...it.armor};if(it.mat)x.mat={art:it.mat.art,per:Math.max(1,Math.round((+it.mat.n||1)/(+it.q||1)))};if(!ITEM[it.n])x.custom=true;c.inv.push(x);got.push((c.name||'Charakter')+': '+it.n)}}
   if(got.length){save();render();toast('Vom Spielleiter erhalten · '+got.join(', '))}}
 function dmView(c){const o=ovOf(c);const els=(o.elements||[]).filter(e=>!(e.typ==='Schule'&&SCHOOLS.includes(e.name))),races=o.races||[],tit=o.titel||[];if(!els.length&&!races.length&&!tit.length)return null;const w=h('div');
   if(tit.length){const tl=h('div');for(const t of tit)tl.append(h('div',{class:'feat'},h('b',{style:'font-family:var(--f-disp);font-style:italic;color:var(--shu);font-size:16px'},'称 '+t.name),t.text?h('p',{class:'note',style:'margin:4px 0 0;white-space:pre-wrap'},t.text):null));w.append(card('称 Titel',tl))}
@@ -1606,7 +1611,7 @@ function openShortRest(c){const cl=C[c.classId];let st={n:0,res:null};const left
       closeModal();toast(dice?`Short Rest: +${heal} Hit Points (${parts.join(', ')})`:'Short Rest beendet')}},'Rasten')))};draw()})}
 function longRest(c,clean){if(clean===undefined)clean=true;let lost=0;upd(c=>{R_(c);c.hp=hpMax(c);if(clean)c.soul=soulMax(c);c.hdUsed=Math.max(0,(c.hdUsed||0)-Math.max(1,Math.floor(c.level/2)));
   for(const x of counters(c))if(x.reset==='long')c.res[x.k]=x.max;afterLongRest(c);if(c.classId==='yokaihunter')lost=gmSpoil(c)});toast('Long Rest: Hit Points'+(clean?', Soul HP':'')+' und Ressourcen aufgefüllt'+(clean?'':' · Soul HP bleiben (verdorbener Ort)')+(lost?' · '+lost+' Gegenmittel verdorben':''));
-  const x=cur();if(x&&x.classId==='yokaihunter'&&x.level>=2&&(x.dec?.teile||[]).some(t=>t.n>0))openBrew(x,true)}
+  const x=cur();if(x&&x.classId==='yokaihunter'&&x.level>=2&&matPool(x).some(t=>t.n>0))openBrew(x,true)}
 function openShrine(c){modal(d=>{const kk=c.classId==='kamikagari';
   d.append(h('div',{class:'label'},'⛩ Nicht verdorbener Schrein'),h('h2',{},'Am Schrein'),h('p',{class:'note'},'Nur an einem nicht verdorbenen Schrein. Was du hier tun kannst:'));
   const opts=[];if(c.corr)opts.push(['Corruption entfernen',c=>{c.corr=false}]);
