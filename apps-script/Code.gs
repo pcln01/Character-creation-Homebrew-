@@ -13,9 +13,11 @@ function doPost(e) {
   } catch (x) {
     return antwort({ ok: false, error: 'bad_json' });
   }
-  if (req.action === 'drops') {
+  if (req.action === 'drops' || req.action === 'gegner' || req.action === 'doc') {
     try {
-      return antwort(drops(req));
+      if (req.action === 'drops') return antwort(drops(req));
+      if (req.action === 'gegner') return antwort(gegner(req));
+      return antwort(dokument(req));
     } catch (x) {
       return antwort({ ok: false, error: 'server', message: String(x) });
     }
@@ -31,6 +33,8 @@ function doPost(e) {
       case 'list': return antwort(liste(req));
       case 'roster': return antwort(gruppe());
       case 'force': return antwort(erzwingen(req));
+      case 'dmget': return antwort(dmHolen(req));
+      case 'dmset': return antwort(dmSetzen(req));
       default: return antwort({ ok: false, error: 'unknown_action' });
     }
   } catch (x) {
@@ -142,7 +146,14 @@ function gruppe() {
     delete c.names;
     return { id: x.id, char: c, updated: x.updated };
   });
-  return { ok: true, chars: chars, forced: erzwungen() };
+  const f = erzwungen();
+  const frei = {};
+  Object.keys(f).forEach(function (id) {
+    const o = JSON.parse(JSON.stringify(f[id] || {}));
+    delete o.mitama;
+    frei[id] = o;
+  });
+  return { ok: true, chars: chars, forced: frei };
 }
 
 function liste(req) {
@@ -247,4 +258,92 @@ function drops(req) {
 function testDrops() {
   const r = drops({ dm: DM_PASSWORT });
   Logger.log(JSON.stringify({ ok: r.ok, fehler: r.error || null, dokumente: r.docs ? r.docs.length : 0, nochNichtGelesen: !!r.more }));
+}
+
+function gegnerOrdner() {
+  const it = DriveApp.getFoldersByName('Gegner');
+  let erster = null;
+  while (it.hasNext()) {
+    const f = it.next();
+    if (f.isTrashed()) continue;
+    if (!erster) erster = f;
+    if (f.getFoldersByName('Boss').hasNext()) return f;
+  }
+  return erster;
+}
+
+function gegnerDateien(ordnerG, pfad, out) {
+  const fi = ordnerG.getFilesByType(MimeType.GOOGLE_DOCS);
+  while (fi.hasNext()) {
+    const f = fi.next();
+    if (!f.isTrashed()) out.push({ f: f, pfad: pfad });
+  }
+  const di = ordnerG.getFolders();
+  while (di.hasNext()) {
+    const d = di.next();
+    if (d.isTrashed() || /archiv/i.test(d.getName())) continue;
+    gegnerDateien(d, pfad.concat([d.getName()]), out);
+  }
+  return out;
+}
+
+function gegner(req) {
+  if (!istDm(req)) return { ok: false, error: 'forbidden' };
+  const start = Date.now();
+  const g = gegnerOrdner();
+  if (!g) return { ok: false, error: 'no_folder' };
+  const cache = lesen('_gegner-cache.json') || {};
+  const neu = {};
+  let geaendert = false;
+  let mehr = false;
+  gegnerDateien(g, [], []).forEach(function (x) {
+    const id = x.f.getId();
+    const u = x.f.getLastUpdated().getTime();
+    if (cache[id] && cache[id].u === u) {
+      neu[id] = cache[id];
+      neu[id].p = x.pfad;
+      return;
+    }
+    if (Date.now() - start > 20000) {
+      mehr = true;
+      return;
+    }
+    neu[id] = { u: u, n: x.f.getName(), p: x.pfad, b: bloecke(DocumentApp.openById(id).getBody()) };
+    geaendert = true;
+  });
+  if (geaendert || Object.keys(neu).length !== Object.keys(cache).length) schreiben('_gegner-cache.json', neu);
+  const docs = Object.keys(neu).map(function (id) { return { id: id, n: neu[id].n, p: neu[id].p, b: neu[id].b }; });
+  return { ok: true, docs: docs, more: mehr };
+}
+
+function dokument(req) {
+  if (!istDm(req)) return { ok: false, error: 'forbidden' };
+  if (typeof req.name !== 'string' || !req.name) return { ok: false, error: 'bad_request' };
+  const it = DriveApp.getFilesByName(req.name);
+  while (it.hasNext()) {
+    const f = it.next();
+    if (f.isTrashed() || f.getMimeType() !== MimeType.GOOGLE_DOCS) continue;
+    return { ok: true, id: f.getId(), n: f.getName(), b: bloecke(DocumentApp.openById(f.getId()).getBody()) };
+  }
+  return { ok: false, error: 'not_found' };
+}
+
+function dmHolen(req) {
+  if (!istDm(req)) return { ok: false, error: 'forbidden' };
+  if (!/^[a-z0-9-]{1,30}$/.test(req.key || '')) return { ok: false, error: 'bad_request' };
+  return { ok: true, value: lesen('_dm-' + req.key + '.json') };
+}
+
+function dmSetzen(req) {
+  if (!istDm(req)) return { ok: false, error: 'forbidden' };
+  if (!/^[a-z0-9-]{1,30}$/.test(req.key || '')) return { ok: false, error: 'bad_request' };
+  if (JSON.stringify(req.value || null).length > 200000) return { ok: false, error: 'too_large' };
+  schreiben('_dm-' + req.key + '.json', req.value || null);
+  return { ok: true };
+}
+
+function testGegner() {
+  const r = gegner({ dm: DM_PASSWORT });
+  const s = dokument({ dm: DM_PASSWORT, name: 'Die-zehn-Schreine' });
+  Logger.log(JSON.stringify({ ok: r.ok, fehler: r.error || null, statblocks: r.docs ? r.docs.length : 0, nochNichtGelesen: !!r.more, schreine: s.ok }));
 }
