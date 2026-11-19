@@ -1490,7 +1490,7 @@ function resVal(c,k,max,empty){const v=(c.res||{})[k];return v==null?(empty?0:ma
 /* ---------- combat ---------- */
 function weaponCat(n){const it=ITEM[n];if(!it)return'';return /Martial/.test(it.d)?'Martial':/Simple/.test(it.d)?'Simple':''}
 const MASTERY={'Katana':['Sap','Graze'],'Wakizashi':['Vex','Sap'],'Naginata':['Graze','Cleave'],'Yari':['Sap','Push'],'Daikyū (Yumi)':['Slow','Vex'],'Hankyū':['Vex','Slow'],'Azusa-yumi':['Vex'],'Kanabō':['Topple','Push'],'Bō':['Topple','Push'],'Tantō':['Nick','Vex'],'Kama':['Nick','Sap'],'Kunai':['Vex','Nick'],'Wurfstern':['Vex','Slow'],'Jitte':['Sap','Topple']};
-const MDESC={Cleave:'Triffst du eine Kreatur mit einem Nahkampfangriff, darfst du eine zweite Kreatur angreifen, die höchstens 5 ft. von der ersten entfernt und in deiner Reichweite ist. Bei einem Treffer erleidet sie den Waffenschaden ohne deinen Attributsmodifikator (außer er ist negativ). Einmal pro Zug.',
+const MDESC={Cleave:'Triffst du eine Kreatur mit einem Nahkampfangriff, darfst du eine zweite Kreatur angreifen, die höchstens 5 ft. von der ersten entfernt und in deiner Reichweite ist. Bei einem Treffer erleidet sie den Waffenschaden ohne deinen Attributsmodifikator (außer er ist negativ). Keine Begrenzung pro Zug: Cleave greift bei jedem Treffer.',
   Graze:'Verfehlt dein Angriff, erleidet das Ziel trotzdem Schaden in Höhe des Attributsmodifikators, den du für den Angriff verwendet hast, vom Schadenstyp der Waffe.',
   Nick:'Den zusätzlichen Angriff durch die Light-Eigenschaft machst du als Teil der Attack Action statt als Bonus Action. Einmal pro Zug.',
   Push:'Triffst du, darfst du das Ziel bis zu 10 ft. direkt von dir wegstoßen, wenn es höchstens Large ist.',
