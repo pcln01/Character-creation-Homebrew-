@@ -784,7 +784,7 @@ function samCombat(c){const d=c.dec||{},l=c.level,pb=prof(l),cb=CB(c);const w=h(
       extra.includes('Seiten-ryū')?pbtn('Ōshike: +'+2*n+'d10',()=>{rollToast('Ōshike',n?2*n+'d10':'0',0);cbUpd((c,cb)=>{cb.verb=0})}):null,
       extra.includes('Seiten-ryū')?pbtn('Tenkiyohō: '+4*n+'d10',()=>{rollToast('Tenkiyohō',n?4*n+'d10':'0',0);cbUpd((c,cb)=>{cb.verb=0})}):null,
       extra.includes('Niten Ichi-ryū')&&st==='Nitō'?pbtn('Ka no Kata: 2× +'+n+'d10',()=>{rollToast('Ka no Kata, Klinge 1',n?n+'d10':'0',0);setTimeout(()=>rollToast('Ka no Kata, Klinge 2',n?n+'d10':'0',0),1600);cbUpd((c,cb)=>{cb.verb=0})}):null),
-    NOTE('Der Abschluss würfelt nur den Zusatzschaden; den Waffenangriff selbst würfelst du in der Tabelle „Angriffe“. Führst du etwas aus, das nicht zur Kata gehört, bricht sie.'),kb));
+    NOTE('Der Abschluss würfelt nur den Zusatzschaden; den Waffenangriff selbst würfelst du in der Tabelle „Angriffe“. Führst du etwas aus, das nicht zur Kata gehört, bricht sie. Der zusätzliche Angriff ab Stufe 5 und der Wakizashi-Angriff brechen sie nicht. In Nitō zählt der Wakizashi-Angriff als Kata-Angriff und bekommt denselben Bonus.'),kb));
   const eide=d.eide||[];const maxE=lvMax(l,[[1,1],[7,2],[15,3]]);const act=eide.filter(e=>e.status==='aktiv');
   const el=h('div');eide.forEach((e,i)=>{if(e.status!=='aktiv')return;const def=DATA.eidText.find(x=>x.n===e.stufe)||DATA.eidText[0];
     el.append(h('div',{class:'feat'},h('b',{},'„'+(e.text||'…')+'“ · '+(e.stufe||'Klein')),h('p',{class:'note',style:'margin:4px 0'},'Segen: '+def.segen+' Bruch: '+def.preis+'.'),
