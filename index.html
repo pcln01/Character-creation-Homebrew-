@@ -793,6 +793,33 @@ function openCraft(c){const pb=prof(c.level);const st={g:null,q:1,use:{}};
           if(left>0){const la=(used.find(x=>x.per>1)||used[used.length-1]).art;const r=c.dec.teile.find(t=>t.art===la);if(r)r.n+=left;else c.dec.teile.push({art:la,n:left})}
           c.dec.teile=c.dec.teile.filter(t=>t.n>0);c.inv=(c.inv||[]).filter(it=>+it.q>0);c.dec.gm=c.dec.gm||[];c.dec.gm.push({n:g,art:g==='Artgift'?art:'',q,life:gmLife(c)})});
         closeModal();toast('Hergestellt: '+q+'× '+g+(g==='Artgift'?' ('+art+')':''))}},'Herstellen')))};draw()})}
+function talKnown(c){const d=c.dec||{};return [...(d.talismane||[]),...ce(c,'Talisman').map(e=>({name:e.name,verb:0}))].filter(t=>t.name)}
+function openTalCraft(c){const m=mods(c);const cap=Math.max(1,m.wis+Math.floor(c.level/2));const st={t:null,q:1,opt:'',use:{}};
+  modal(dlg=>{const draw=()=>{dlg.textContent='';const kn=talKnown(c);const t=kn.find(x=>x.name===st.t);const txt=t?(DATA.talisText[t.name]||ceText(c,t.name)||''):'';
+    dlg.append(h('div',{class:'label'},'⚒ Talisman herstellen'),h('h2',{},st.t?'Womit stellst du '+st.t+' her?':'Welchen Talisman?'));
+    if(!kn.length){dlg.append(NOTE('Du kennst noch keinen Talisman (Reiter „Klasse“).'),h('div',{class:'foot'},h('span'),h('button',{class:'btn ghost',type:'button',onclick:closeModal},'Schließen')));return}
+    dlg.append(h('div',{class:'pick'},kn.map(x=>h('button',{class:'pill',type:'button',id:'tal-c-'+x.name,'aria-pressed':String(st.t===x.name),onclick:()=>{st.t=x.name;st.opt='';draw()}},x.name+(+x.verb?' +'+x.verb:'')))));
+    if(!t){dlg.append(NOTE('Wähle einen deiner Talismane. Danach suchst du aus, was du dafür verwendest.'),h('div',{class:'foot'},h('span'),h('button',{class:'btn ghost',type:'button',onclick:closeModal},'Abbrechen')));return}
+    dlg.append(h('p',{class:'note'},txt+(+t.verb?' · verbessert +'+t.verb:'')));
+    if(/bei Herstellung/i.test(txt)){let oi;if(t.name==='Siegel des Geschicks'){oi=h('select',{id:'talOpt','aria-label':'Fertigkeit'},h('option',{value:''},'Fertigkeit wählen …'),DATA.skills.map(k=>h('option',{value:k,selected:st.opt===k||null},k)))}
+      else if(/Armor Class ODER Advantage|\+1 AC oder Advantage/i.test(txt)){oi=h('select',{id:'talOpt','aria-label':'Wirkung'},h('option',{value:''},'Wirkung wählen …'),['+1 Armor Class','Advantage auf Saving Throws'].map(k=>h('option',{value:k,selected:st.opt===k||null},k)))}
+      else oi=h('input',{id:'talOpt',value:st.opt,placeholder:'Bei der Herstellung gewählt …','aria-label':'Bei der Herstellung gewählt'});
+      oi.addEventListener('change',()=>{st.opt=oi.value.trim();draw()});dlg.append(row(h('label',{class:'note',for:'talOpt'},'Bei der Herstellung festgelegt:'),oi))}
+    const qi=nIn('talQ',st.q,1,cap,56);qi.addEventListener('change',()=>{st.q=Math.max(1,Math.min(cap,+qi.value||1));draw()});
+    dlg.append(row(h('label',{class:'note',for:'talQ'},'Anzahl (höchstens '+cap+', deine Bereitschaft)'),qi));
+    const src=(c.inv||[]).filter(i=>!i.equipped&&!i.att&&+i.q>0);
+    dlg.append(h('div',{class:'label',style:'margin-top:10px'},'Was verwendest du?'));
+    if(!src.length)dlg.append(NOTE('Nichts im Inventar, das du verwenden könntest.'));
+    for(const x of src){const n=st.use[x.id]||0;dlg.append(h('div',{class:'feat'},h('div',{class:'addrow',style:'align-items:center;flex-wrap:wrap'},h('b',{style:'flex:1;min-width:160px'},x.n),h('span',{class:'note'},(x.q||1)+' da'),
+      sbtn('−',()=>{st.use[x.id]=Math.max(0,n-1);draw()},{'aria-label':x.n+' weniger',disabled:!n||null}),h('b',{},String(n)),sbtn('+',()=>{st.use[x.id]=n+1;draw()},{'aria-label':x.n+' mehr',id:'talUse-'+x.id,disabled:n>=(x.q||1)||null}))))}
+    const needOpt=/bei Herstellung/i.test(txt)&&!st.opt;const used=src.filter(x=>st.use[x.id]);
+    dlg.append(NOTE('Welche Materialien ein Talisman verbraucht, steht nicht in deinen Dokumenten. Wähle, was du verwendest; der Spielleiter entscheidet, ob es reicht. Ausgewähltes wird verbraucht.'),
+      h('div',{class:'foot'},h('button',{class:'btn ghost',type:'button',onclick:closeModal},'Abbrechen'),h('button',{class:'btn',type:'button',id:'talOk',disabled:needOpt||null,onclick:()=>{
+        const nm=t.name+(st.opt?' ('+st.opt+')':'');const q=st.q;const usedTxt=used.map(x=>st.use[x.id]+'× '+x.n).join(', ');
+        upd(c=>{for(const x of used){const it=c.inv.find(i=>i.id===x.id);if(it)it.q-=st.use[x.id]}c.inv=c.inv.filter(i=>+i.q>0);
+          const cat=ITEM[t.name];const ex=c.inv.find(i=>i.n===nm&&i.crafted&&(+i.verb||0)===(+t.verb||0));
+          if(ex)ex.q=(ex.q||1)+q;else c.inv.push({id:uid(),n:nm,d:txt+(+t.verb?' · verbessert +'+t.verb:'')+' · hergestellt von '+(c.name||'dir')+(usedTxt?' · aus '+usedTxt:''),q,w:cat?+cat.w||0:0,custom:true,crafted:true,verb:+t.verb||0})});
+        closeModal();toast('Hergestellt: '+q+'× '+nm)}},'Herstellen')))};draw()})}
 function gmSpoil(c){if(!c.dec||!c.dec.gm)return 0;let lost=0;for(const g of c.dec.gm)g.life--;c.dec.gm=c.dec.gm.filter(g=>{if(g.life<=0){lost+=g.q;return false}return true});return lost}
 
 /* ---------- Samurai ---------- */
@@ -859,7 +886,7 @@ function priestCombat(c){const d=c.dec||{},l=c.level,pb=prof(l),m=mods(c);const 
   w.append(card('魂 Seelenritual · '+resVal(c,'rituale',mx('rituale'))+' übrig',NOTE(`Ziel in 60 ft., WIS-Saving Throw gegen DC ${dc}: voller Seelenschaden, bei Erfolg die Hälfte. Ignoriert AC, Hit Points und Resistenzen. Dazu Radiant Damage in doppelter Höhe auf die Hit Points.`),
     row(pbtn('Ritual: '+dice,()=>{if(!use('rituale',mx('rituale')))return;const r=roll(dice);toast(`Seelenschaden ${r.tot} (${r.parts.join(' + ')}) · Radiant ${2*r.tot} · halbiert bei Erfolg`)},{id:'ritBtn'}))));
   const tl=h('div');for(const t of [...(d.talismane||[]),...ce(c,'Talisman').map(e=>({name:e.name,verb:0}))]){if(!t.name)continue;tl.append(h('div',{class:'feat'},h('div',{class:'addrow',style:'align-items:center;flex-wrap:wrap'},h('b',{},t.name+(+t.verb?' +'+t.verb:'')),sbtn('Einsetzen',()=>{if(use('bereit',mx('bereit')))toast(t.name+' eingesetzt')})),h('p',{class:'note',style:'margin:4px 0 0'},DATA.talisText[t.name]||ceText(c,t.name)||'Eigener Talisman.')))}
-  w.append(card('符 Talismane · '+resVal(c,'bereit',mx('bereit'))+' von '+mx('bereit')+' bereit',tl.childNodes.length?tl:NOTE('Noch keine Talismane eingetragen (Reiter „Klasse“).')));
+  w.append(card('符 Talismane · '+resVal(c,'bereit',mx('bereit'))+' von '+mx('bereit')+' bereit',tl.childNodes.length?tl:NOTE('Noch keine Talismane eingetragen (Reiter „Klasse“).'),row(pbtn('⚒ Talisman herstellen …',()=>openTalCraft(c),{id:'talCraftBtn'}))));
   if(l>=6){const gl=h('div');for(const g of d.geister||[])if(g.name)gl.append(row(h('b',{},g.name),h('span',{class:'note'},g.schrein||''),sbtn('Rufen (Action)',()=>{if(use('geisterruf',mx('geisterruf')))toast(g.name+' erscheint')})));
     w.append(card('霊 Geisterruf · '+resVal(c,'geisterruf',mx('geisterruf'))+' übrig',NOTE('Erscheint in 30 ft., handelt auf deiner Initiative, bleibt '+(l>=18?'1 Stunde':'10 Minuten')+'. CR bis '+(l>=18?9:l>=14?5:1)+(l>=18?', zwei gleichzeitig.':', einer gleichzeitig.')),gl.childNodes.length?gl:NOTE('Noch keine Geisternamen.')))}
   if(l>=17)w.append(card('Kapstein-Rituale',row(pbtn('Seelenbruch',()=>{if(use('seelenbruch',1))toast('Seelenbruch: WIS-Saving Throw DC '+dc+', bei Misserfolg Soul HP auf 0')}),pbtn('Säule des Feuers 10d6 + '+m.wis,()=>{if(use('saeule',1))rollToast('Säule des Feuers (Radiant)','10d6',m.wis)}))));
@@ -1545,6 +1572,7 @@ function viewInv(c){const cl=C[c.classId];const w=h('div');c.inv=c.inv||[];
   const load=h('div',{class:'vital'+(over?' over':'')},h('div',{class:'label'},'Traglast'),h('div',{class:'big'},fmtW(tot),h('small',{},' / '+cap+' lb.')),h('div',{class:'bar'},h('i',{style:`width:${Math.min(100,tot/cap*100)}%`})),
     h('div',{class:'note',style:over?'color:var(--shu);font-weight:700':''},over?'Überladen: Du trägst mehr, als du kannst.':'STR '+score(c,'str')+' × 15'+(c.raceId==='oni'?(c.level>=3?' × 4 (Oni)':' × 2 (Oni)'):'')));
   if(c.classId==='yokaihunter'){w.append(sec('薬','Gegenmittel-Beutel',gmBag(c)))}
+  if(c.classId==='schreinpriester'){w.append(sec('符','Talismane herstellen',row(pbtn('⚒ Talisman herstellen …',()=>openTalCraft(c),{id:'talCraftInv'})),NOTE('Wähle einen deiner Talismane, lege fest, was bei der Herstellung gewählt wird, und such aus, was du dafür verwendest. Der fertige Talisman landet im Inventar.')))}
   w.append(sec('金','Geld und Traglast',h('div',{class:'vitals',style:'grid-template-columns:repeat(2,minmax(0,1fr))'},h('div',{class:'vital'},h('div',{class:'label'},'Goldstücke'),h('div',{class:'gold',style:'margin-top:6px'},h('span',{class:'coin'},'金'),g),h('div',{class:'note'},'50 Münzen wiegen 1 lb.')),load)));
   const list=h('div',{class:'inv'});
   if(!c.inv.length)list.append(h('p',{class:'note'},'Dein Bündel ist leer. Übernimm die gemeinsame Ausrüstung oder füge Gegenstände aus den Listen unten hinzu.'));
