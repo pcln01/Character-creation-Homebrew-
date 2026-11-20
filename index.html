@@ -747,7 +747,7 @@ function gmBag(c){const d=c.dec||{};const w=h('div');const teile=d.teile||[];con
       pbtn('Einnehmen / geben',()=>upd(c=>{const x=c.dec.gm[i];x.q--;if(x.q<=0)c.dec.gm.splice(i,1)}),{id:'gmUse-'+i})),h('p',{class:'note',style:'margin:4px 0 0'},def?def.t:'')))});
   if(!gm.length)gl.append(NOTE('Keine Gegenmittel vorrätig.'));
   w.append(h('div',{class:'label',style:'margin-top:14px'},'Gegenmittel · Action: einnehmen oder einem Verbündeten in Reichweite geben'+(c.level>=6?' · ab Stufe 6 zwei gleichzeitig':'')),gl,
-    row(c.level>=2?pbtn('⚗ Brauen (Long Rest)',()=>openBrew(c),{id:'brewBtn'}):h('span',{class:'note'},'Brauen ab Stufe 2.')),
+    row(c.level>=2?pbtn('⚒ Herstellen …',()=>openCraft(c),{id:'craftBtn'}):null,c.level>=2?sbtn('⚗ Brauen (Long Rest)',()=>openBrew(c),{id:'brewBtn'}):h('span',{class:'note'},'Brauen ab Stufe 2.')),
     NOTE('Brauen: Bei einem Long Rest so viele Gegenmittel wie dein Proficiency Bonus ('+prof(c.level)+'), sofern du Yokai-Teile hast. Sie verderben beim '+(c.level>=10?'übernächsten':'nächsten')+' Long Rest. Wird beim Long Rest automatisch angeboten.'),
     NOTE('Yokai-Teile sind die Yokai-Materialien aus den Drops. Jedes Gegenmittel kostet 1 Materialwert: Krallen, Zähne und Haut je 1, Fleisch 2. Das Brauen nimmt sie direkt aus deinem Inventar, dazu die Teile aus der Liste oben (Materialwert). Artgift braucht ein Teil der gewählten Art.'));
   return w}
@@ -770,6 +770,29 @@ function openBrew(c,fromRest){const d=c.dec||{};const pb=prof(c.level);let st={p
       upd(c=>{R_(c);if(st.pick.Artgift)matTake(c,st.art.a,st.pick.Artgift);
         const rest=Object.entries(st.pick).filter(([k])=>k!=='Artgift').reduce((s,[,n])=>s+n,0);if(rest)matTake(c,null,rest);c.dec.gm=c.dec.gm||[];for(const[k,n]of Object.entries(st.pick))if(n>0)c.dec.gm.push({n:k,art:k==='Artgift'?st.art.a:'',q:n,life:gmLife(c)})});
       closeModal();toast('Gebraut: '+chosen+' Gegenmittel')}},'Brauen')))};draw()})}
+function openCraft(c){const pb=prof(c.level);const st={g:null,q:1,use:{}};
+  modal(dlg=>{const draw=()=>{dlg.textContent='';const teile=((c.dec&&c.dec.teile)||[]).map((t,i)=>({t,i})).filter(x=>x.t.n>0);
+    const src=[...teile.map(({t,i})=>({k:'t'+i,i,kind:'t',label:t.art+' · Teile aus deiner Liste',art:t.art,per:1,max:t.n})),...invMats(c).map(x=>({k:'i'+x.it.id,id:x.it.id,kind:'i',label:x.it.n,art:x.art,per:x.per,max:+x.it.q}))];
+    const val=src.reduce((a,x)=>a+(st.use[x.k]||0)*x.per,0);const arts=[...new Set(src.filter(x=>st.use[x.k]).map(x=>x.art))];const need=st.q;const isA=st.g==='Artgift';
+    dlg.append(h('div',{class:'label'},'⚒ Gegenmittel herstellen'),h('h2',{},st.g?'Womit stellst du '+st.g+' her?':'Welches Gegenmittel?'),
+      h('div',{class:'pick'},DATA.gegenmittel.map(g=>h('button',{class:'pill',type:'button',id:'craft-g-'+g.n,'aria-pressed':String(st.g===g.n),onclick:()=>{st.g=g.n;st.use={};draw()}},g.n))));
+    if(!st.g){dlg.append(NOTE('Wähle ein Gegenmittel. Danach suchst du aus, welche Yokai-Teile du dafür verwendest.'),h('div',{class:'foot'},h('span'),h('button',{class:'btn ghost',type:'button',onclick:closeModal},'Abbrechen')));return}
+    const def=DATA.gegenmittel.find(g=>g.n===st.g);dlg.append(h('p',{class:'note'},def?def.t:''));
+    const qi=nIn('craftQ',st.q,1,pb,56);qi.addEventListener('change',()=>{st.q=Math.max(1,Math.min(pb,+qi.value||1));st.use={};draw()});
+    dlg.append(row(h('label',{class:'note',for:'craftQ'},'Anzahl (höchstens '+pb+', Proficiency Bonus)'),qi));
+    if(!src.length){dlg.append(NOTE('Du hast keine Yokai-Teile, weder im Inventar noch in deiner Liste.'),h('div',{class:'foot'},h('span'),h('button',{class:'btn ghost',type:'button',onclick:closeModal},'Schließen')));return}
+    dlg.append(h('div',{class:'label',style:'margin-top:10px'},'Was verwendest du? Materialwert '+val+' von '+need+(isA?' · Artgift: alle Teile von einer Art':'')));
+    for(const x of src){const n=st.use[x.k]||0;const blockA=isA&&arts.length&&!arts.includes(x.art);
+      dlg.append(h('div',{class:'feat',style:blockA?'opacity:.45':''},h('div',{class:'addrow',style:'align-items:center;flex-wrap:wrap'},h('b',{style:'flex:1;min-width:160px'},x.label),h('span',{class:'chip'},x.art),h('span',{class:'note'},'je '+x.per+' · '+x.max+' da'),
+        sbtn('−',()=>{st.use[x.k]=Math.max(0,n-1);draw()},{'aria-label':x.label+' weniger',disabled:!n||null}),h('b',{},String(n)),sbtn('+',()=>{st.use[x.k]=n+1;draw()},{'aria-label':x.label+' mehr',id:'craft+'+x.k,disabled:(n>=x.max||val>=need||blockA)?true:null}))))}
+    const ok=val>=need&&(!isA||arts.length===1);const left=val-need;
+    dlg.append(NOTE('Krallen, Zähne und Haut sind je 1 Materialwert, Fleisch 2. Bleibt etwas übrig, kommt der Rest als Teile in deine Liste.'+(left>0?' Übrig: '+left+'.':'')),
+      h('div',{class:'foot'},h('button',{class:'btn ghost',type:'button',onclick:closeModal},'Abbrechen'),h('button',{class:'btn',type:'button',id:'craftOk',disabled:!ok||null,onclick:()=>{
+        const used=src.filter(x=>st.use[x.k]);const g=st.g,q=need,art=arts[0]||'';
+        upd(c=>{R_(c);c.dec.teile=c.dec.teile||[];for(const x of used){const n=st.use[x.k];if(x.kind==='t')c.dec.teile[x.i].n-=n;else{const it=c.inv.find(i=>i.id===x.id);if(it)it.q-=n}}
+          if(left>0){const la=(used.find(x=>x.per>1)||used[used.length-1]).art;const r=c.dec.teile.find(t=>t.art===la);if(r)r.n+=left;else c.dec.teile.push({art:la,n:left})}
+          c.dec.teile=c.dec.teile.filter(t=>t.n>0);c.inv=(c.inv||[]).filter(it=>+it.q>0);c.dec.gm=c.dec.gm||[];c.dec.gm.push({n:g,art:g==='Artgift'?art:'',q,life:gmLife(c)})});
+        closeModal();toast('Hergestellt: '+q+'× '+g+(g==='Artgift'?' ('+art+')':''))}},'Herstellen')))};draw()})}
 function gmSpoil(c){if(!c.dec||!c.dec.gm)return 0;let lost=0;for(const g of c.dec.gm)g.life--;c.dec.gm=c.dec.gm.filter(g=>{if(g.life<=0){lost+=g.q;return false}return true});return lost}
 
 /* ---------- Samurai ---------- */
