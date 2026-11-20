@@ -1145,7 +1145,8 @@ function gearStep(d,st,draw){const g=GEAR[st.classId];if(!g)return;st.gearPick=s
   if(shieldOk(st)){const sh=Object.keys(ITEM).find(isShield);if(sh)box.append(h('div',{class:'pick',style:'margin-top:8px'},h('button',{class:'pill',type:'button','aria-pressed':String(!!st.gs),id:'gs',onclick:()=>{st.gs=!st.gs;draw()}},sh+' (Schild) · '+ITEM[sh].w+' lb.')))}
   const list=gearList(st);const tw=tenguW(st);box.append(h('p',{class:'note',style:'margin-top:10px'},h('b',{},'Du bekommst: '),list.length?list.join(', '):'—'),tw?h('p',{class:'note'},'Tengu: Deine Bergschule-Waffe ('+tw+') bekommst du zusätzlich.'):null);d.append(box)}
 function gearValid(st){const g=GEAR[st.classId];if(!g)return true;gearInit(st);if(!(g.choose||[]).filter(c=>!gearFreeK(st).includes(c.k)).every(ch=>(st.gearPick||{})[ch.k]))return false;return st.gw.length<=gearCap(st)&&(st.gw.length>0||st.classId==='hanyo')}
-function gearApply(c,st){for(const n of gearList(st)){addItem(c,ITEM[n]);const it=c.inv.find(i=>i.n===n);const cat=ITEM[n].cat;if(cat==='Waffe'||(it.armor&&it.armor.type!=='clothes'))it.equipped=true}}
+function gearApply(c,st){const L=gearList(st);for(const n of L)addItem(c,ITEM[n]);const rk=n=>isBody(n)?0:isShield(n)?1:2;
+  for(const n of [...L].sort((a,b)=>rk(a)-rk(b))){const it=c.inv.find(i=>i.n===n);const cat=ITEM[n].cat;if((cat==='Waffe'||(it.armor&&it.armor.type!=='clothes'))&&!equipErr(c,it))it.equipped=true}}
 /* ---------- Spielleiter-Zusätze: Items, Klassenelemente, Rassen ---------- */
 function ovOf(c){const r=(store.forced||{})[c.id];return r||c.dmo||{}}
 const CLAN_FIX={'2zdmq9e1a6r1':['Ōtomo','Kume']};
@@ -1174,7 +1175,7 @@ function dmRevApply(c,it,got){c.dmRev=c.dmRev||{};const r=+it.rev||0;if(r<=(+c.d
   const x=(c.inv||[]).find(i=>i.src===it.id)||(c.inv||[]).find(i=>i.dm&&!i.src&&i.n===it.n);if(!x)return;x.src=it.id;
   if(!ITEM[it.n]){if(it.armor){x.armor={...it.armor};delete x.wf}else if(it.wf){x.wf={...it.wf};delete x.armor}else{if(x.armor||x.wf)x.equipped=false;delete x.armor;delete x.wf}}
   x.attReq=!!it.attReq;if(!x.attReq)x.att=false;if(it.d)x.d=it.d+' · vom Spielleiter';got.push((c.name||'Charakter')+': '+x.n+' geändert')}
-function tenguFix(c,got){if(c.tenguGear||c.raceId!=='tengu')return;const n=c.dec&&c.dec.tengu;if(!n||!ITEM[n])return;c.tenguGear=1;if((c.inv||[]).some(i=>wBaseN(i)===n))return;c.inv=c.inv||[];addItem(c,ITEM[n]);const it=c.inv.find(i=>i.n===n);if(it)it.equipped=true;got.push((c.name||'Charakter')+': Bergschule-Waffe '+n)}
+function tenguFix(c,got){if(c.tenguGear||c.raceId!=='tengu')return;const n=c.dec&&c.dec.tengu;if(!n||!ITEM[n])return;c.tenguGear=1;if((c.inv||[]).some(i=>wBaseN(i)===n))return;c.inv=c.inv||[];addItem(c,ITEM[n]);const it=c.inv.find(i=>i.n===n);if(it&&!equipErr(c,it))it.equipped=true;got.push((c.name||'Charakter')+': Bergschule-Waffe '+n)}
 function deliverDm(){const got=[];for(const c of S.chars){armorFix(c,got);tenguFix(c,got);const o=ovOf(c);const f=CLAN_FIX[c.id];if(f&&c.clan===f[0]&&o.clan===undefined)clanSync(c,{clan:f[1]},got);clanSync(c,o,got);for(const it of o.items||[]){c.dmGot=c.dmGot||[];if(c.dmGot.includes(it.id)){dmRevApply(c,it,got);continue}c.dmGot.push(it.id);c.dmRev=c.dmRev||{};c.dmRev[it.id]=+it.rev||0;
       const x={id:uid(),n:it.n,d:(it.d?it.d+' · ':'')+'vom Spielleiter',q:+it.q||1,w:+it.w||catW(it.n),dm:true,src:it.id};if(it.armor)x.armor={...it.armor};if(it.wf)x.wf={...it.wf};if(it.attReq)x.attReq=true;if(it.mat)x.mat={art:it.mat.art,per:Math.max(1,Math.round((+it.mat.n||1)/(+it.q||1)))};if(!ITEM[it.n])x.custom=true;c.inv.push(x);got.push((c.name||'Charakter')+': '+it.n)}}
   if(got.length){save();render();toast('Vom Spielleiter erhalten · '+got.join(', '))}}
@@ -1440,6 +1441,20 @@ function wBaseN(it){return it.base||it.n}
 function mkWd(f){return [(f.dmg||'1d4')+' '+(f.type||'Bludgeoning'),(f.props||'').trim(),f.cat||'Simple'].filter(Boolean).join(' · ')}
 function wDesc(it){if(it.armor)return null;if(it.wf)return mkWd(it.wf);const x=ITEM[wBaseN(it)];return x&&x.cat==='Waffe'?x.d:null}
 function isWpn(it){return !!wDesc(it)}
+function handsOf(it,hh){if(it.armor)return it.armor.type==='shield'?1:0;const d=wDesc(it);if(!d)return 0;if(/Two-Handed|zweihändig/i.test(d))return 2;if(/Versatile/i.test(d))return (hh??it.hands)===2?2:1;return 1}
+function isVers(it){const d=wDesc(it);return !!d&&/Versatile/i.test(d)&&!/Two-Handed|zweihändig/i.test(d)}
+function isBodyIt(it){return !!it.armor&&it.armor.type!=='shield'}
+function equipErr(c,it,hh){const eq=(c.inv||[]).filter(i=>i.equipped&&i.id!==it.id);
+  if(isBodyIt(it)){const o=eq.find(isBodyIt);if(o)return 'Du trägst schon '+o.n+'. Lege es erst ab.'}
+  if(it.armor&&it.armor.type==='shield'){const o=eq.find(i=>i.armor&&i.armor.type==='shield');if(o)return 'Du führst schon den Schild '+o.n+'. Lege ihn erst ab.'}
+  const need=handsOf(it,hh);const used=eq.reduce((a,i)=>a+handsOf(i),0);
+  if(need&&used+need>2)return 'Deine Hände sind belegt ('+eq.filter(i=>handsOf(i)).map(i=>i.n+(handsOf(i)===2?' zweihändig':'')).join(', ')+'). '+it.n+(need===2?' braucht beide Hände':' braucht eine freie Hand')+'. Lege erst etwas ab.';
+  return null}
+function tryEquip(c,it,on){if(on){const e=equipErr(c,it);if(e){toast(e);render();return}}upd(c=>{const x=c.inv.find(i=>i.id===it.id);if(x)x.equipped=on})}
+function setHands(c,it,n){if(it.equipped){const e=equipErr(c,it,n);if(e){toast(e);render();return}}upd(c=>{const x=c.inv.find(i=>i.id===it.id);if(x)x.hands=n})}
+function equipSum(c){const eq=(c.inv||[]).filter(i=>i.equipped);const body=eq.filter(isBodyIt),sh=eq.filter(i=>i.armor&&i.armor.type==='shield');const hands=eq.reduce((a,i)=>a+handsOf(i),0);
+  const over=body.length>1||sh.length>1||hands>2;
+  return h('div',{class:'note',id:'equipSum',style:'margin:0 0 6px'+(over?';color:var(--shu);font-weight:700':'')},'Rüstung: '+(body.map(i=>i.n).join(', ')||'keine')+' · Hände '+hands+'/2'+(eq.some(i=>handsOf(i))?' ('+eq.filter(i=>handsOf(i)).map(i=>i.n+(handsOf(i)===2?' zweihändig':i.armor?'':' einhändig')).join(', ')+')':'')+(over?' · Zu viel ausgerüstet: lege etwas ab.':''))}
 function attCount(c){return (c.inv||[]).filter(i=>i.att).length}
 function modTxt(it){const m=it.mod;if(!m)return'';return 'modifiziert: '+[+m.hit?sgn(+m.hit)+' Treffer':'',+m.dmg?sgn(+m.dmg)+' Schaden':'',m.extra?'+'+m.extra:'',m.note||''].filter(Boolean).join(', ')}
 function kindFields(st,fixed){const w=h('div');const draw=()=>{w.replaceChildren();
@@ -1517,7 +1532,8 @@ function viewInv(c){const cl=C[c.classId];const w=h('div');c.inv=c.inv||[];
     list.append(h('div',{class:'it'},
     h('div',{},h('div',{class:'n'},it.n,it.from?h('span',{class:'chip',style:'margin-left:6px'},'von '+it.from):null,it.att?h('span',{class:'chip shu',style:'margin-left:6px'},'◆ Attunement'):null,md?h('span',{class:'chip',style:'margin-left:6px'},'⚒ modifiziert'):null,mChips(c,wBaseN(it))),
       it.base&&it.base!==it.n?h('div',{class:'d'},'Basis: '+it.base):null,it.wf?h('div',{class:'d'},'Waffe · '+mkWd(it.wf)):null,it.armor&&!ITEM[wBaseN(it)]?.armor?h('div',{class:'d'},'Rüstung · '+(ARMT.find(a=>a[0]===it.armor.type)||['',''])[1]+' · AC '+it.armor.base):null,md?h('div',{class:'d',style:'color:var(--shu)'},'⚒ '+md):null,it.d?h('div',{class:'d'},it.d):null,acts),
-    (it.armor||wp)?h('label',{class:'eq'},(()=>{const cb=h('input',{type:'checkbox',id:'eq-'+it.id});cb.checked=!!it.equipped;cb.addEventListener('change',()=>upd(c=>{const x=c.inv.find(i=>i.id===it.id);x.equipped=cb.checked}));return cb})(),it.armor?'angelegt':'bereit'):h('span'),
+    (it.armor||wp)?h('div',{class:'eq',style:'display:flex;flex-direction:column;gap:4px;align-items:flex-start'},h('label',{style:'display:flex;gap:6px;align-items:center'},(()=>{const cb=h('input',{type:'checkbox',id:'eq-'+it.id});cb.checked=!!it.equipped;cb.addEventListener('change',()=>tryEquip(c,it,cb.checked));return cb})(),it.armor?'angelegt':'bereit'),
+      wp&&isVers(it)?(()=>{const sl=h('select',{id:'hd-'+it.id,'aria-label':it.n+' ein- oder zweihändig',style:'font-size:12px;padding:2px 4px'},h('option',{value:'1',selected:it.hands!==2||null},'einhändig'),h('option',{value:'2',selected:it.hands===2||null},'zweihändig'));sl.addEventListener('change',()=>setHands(c,it,+sl.value));return sl})():wp?h('span',{class:'note',style:'font-size:11px'},handsOf(it)===2?'zweihändig':'einhändig'):null):h('span'),
     h('span',{class:'iw'},fmtW(iw*(it.q||1))+' lb.'),
     h('div',{class:'qty'},h('button',{type:'button','aria-label':'Weniger',onclick:()=>upd(c=>{const x=c.inv.find(i=>i.id===it.id);x.q=Math.max(1,(x.q||1)-1)})},'−'),h('span',{},it.q||1),h('button',{type:'button','aria-label':'Mehr',onclick:()=>upd(c=>{const x=c.inv.find(i=>i.id===it.id);x.q=(x.q||1)+1})},'+')),
     h('button',{class:'iconb',type:'button','aria-label':it.n+' entfernen',onclick:()=>upd(c=>{c.inv=c.inv.filter(i=>i.id!==it.id)})},'✕')));
@@ -1531,7 +1547,7 @@ function viewInv(c){const cl=C[c.classId];const w=h('div');c.inv=c.inv||[];
   const attBox=h('div',{class:'vital',id:'attBox'},h('div',{class:'label'},'Attunement'),h('div',{class:'big'},String(att.length),h('small',{},' / '+ATT_MAX+' Slots')),
     h('div',{style:'display:grid;gap:4px;margin-top:6px'},...Array.from({length:ATT_MAX},(_,i)=>{const x=att[i];return h('div',{class:'chip'+(x?' shu':''),style:'text-align:left;border-radius:4px'},(i+1)+'. '+(x?'◆ '+x.n:'— frei —'))})),
     h('div',{class:'note'},'5e-Regel: höchstens '+ATT_MAX+' eingestimmte Gegenstände. Einstimmen braucht einen Short Rest mit dem Gegenstand.'+(c.inv.some(i=>i.attReq&&!i.att)?' Noch nicht eingestimmt: '+c.inv.filter(i=>i.attReq&&!i.att).map(i=>i.n).join(', ')+'.':'')));
-  w.append(sec('持','Inventar',attBox,h('div',{style:'height:10px'}),list,h('div',{class:'addrow'},nm,nk,nd,nw,h('button',{class:'btn small',type:'button',onclick:addOwn},'Hinzufügen')),NOTE('Waffe oder Rüstung wählen öffnet danach die Werte. Mit ✎ benennst du einen Gegenstand um, änderst seine Art oder trägst eine Modifikation ein, z. B. ein vom Schmied verbessertes Katana.')));
+  w.append(sec('持','Inventar',attBox,h('div',{style:'height:10px'}),equipSum(c),list,h('div',{class:'addrow'},nm,nk,nd,nw,h('button',{class:'btn small',type:'button',onclick:addOwn},'Hinzufügen')),NOTE('Waffe oder Rüstung wählen öffnet danach die Werte. Mit ✎ benennst du einen Gegenstand um, änderst seine Art oder trägst eine Modifikation ein, z. B. ein vom Schmied verbessertes Katana.')));
   const st=h('div');for(const s of cl.start)st.append(h('p',{class:'note',style:'margin:4px 0;color:var(--sumi-2)'},s.k?h('b',{},s.k+': '):null,s.v));
   st.append(h('div',{class:'addrow'},h('button',{class:'btn ghost small',type:'button',onclick:()=>addCommon(c)},'Gemeinsame Ausrüstung übernehmen')));
   w.append(sec('始','Startausrüstung · '+cl.name,st));
@@ -1625,9 +1641,9 @@ function isProf(c,n,dd){const it=ITEM[n]||(dd?{d:dd}:null);if(!it)return true;co
 function attacks(c){const m=mods(c),pb=prof(c.level);const out=[];
   for(const it of c.inv||[]){const xd=wDesc(it);if(!xd||!it.equipped)continue;const bn=wBaseN(it);const md=it.mod||{};
     const fin=/Finesse/.test(xd),rng=it.wf?!!it.wf.rng:/Ammunition|40 ft\./.test(xd);const ab=rng?'dex':fin?(m.dex>=m.str?'dex':'str'):'str';const p=isProf(c,bn,xd);
-    const dm=xd.match(new RegExp('^([\\dd +]+?) ('+DTYPES.join('|')+')'));const vs=xd.match(/versatile \((1d\d+)\)/);let dmg=dm?dm[1].trim():'—',type=dm?dm[2]:'';
+    const dm=xd.match(new RegExp('^([\\dd +]+?) ('+DTYPES.join('|')+')'));let vs=xd.match(/versatile \((1d\d+)\)/);let dmg=dm?dm[1].trim():'—',type=dm?dm[2]:'';const vers=/Versatile/i.test(xd)&&!/Two-Handed/i.test(xd);if(vers){if(it.hands===2&&vs)dmg=vs[1];vs=null}
     const ex=(md.extra||'').match(/^\+?\s*(\d*d\d+)\s*(.*)$/);if(ex&&dmg!=='—'){dmg+=' + '+ex[1];if(ex[2]&&ex[2]!==type)type+=' + '+ex[2]}
-    const mt=[+md.hit?sgn(+md.hit)+' Treffer':'',+md.dmg?sgn(+md.dmg)+' Schaden':'',ex?'+'+md.extra:'',md.note||''].filter(Boolean).join(', ');const note=[bn!==it.n?bn:'',xd.split(' · ').slice(1).join(' · '),mt?'⚒ '+mt:''].filter(Boolean).join(' · ');
+    const mt=[+md.hit?sgn(+md.hit)+' Treffer':'',+md.dmg?sgn(+md.dmg)+' Schaden':'',ex?'+'+md.extra:'',md.note||''].filter(Boolean).join(', ');const note=[bn!==it.n?bn:'',vers?(it.hands===2?'zweihändig':'einhändig'):'',xd.split(' · ').slice(1).join(' · '),mt?'⚒ '+mt:''].filter(Boolean).join(' · ');
     out.push({n:it.n,base:bn,rng,hit:m[ab]+(p?pb:0)+(+md.hit||0),dmg,type,vs:vs?vs[1]:null,mod:m[ab]+(+md.dmg||0),ab,p,note})}
   if(c.classId==='hanyo'){const ab=m.dex>m.str?'dex':'str';const cl=lvMax(c.level,[[1,'1d6'],[5,'1d8'],[11,'1d10'],[17,'2d6']]);const bon=gradDmg(c);
     out.push({n:'Klauen',hit:m[ab]+pb,dmg:cl,type:'Slashing',mod:m[ab]+bon,ab,p:true,note:'Natürliche, magische Waffe'+(bon?' · Yokai-Grad +'+bon:'')});
