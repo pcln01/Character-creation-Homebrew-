@@ -1586,7 +1586,7 @@ function resVal(c,k,max,empty){const v=(c.res||{})[k];return v==null?(empty?0:ma
 /* ---------- combat ---------- */
 function swordAb(c){const m=mods(c);const a=attacks(c).find(x=>x.base);return a?a.ab:(m.dex>m.str?'dex':'str')}
 function dcList(c){const m=mods(c),pb=prof(c.level);const out=[];const ab=DCAB[c.classId];
-  if(c.classId==='samurai'){const sa=swordAb(c);out.push({l:'Technik-DC',v:8+pb+m[sa],ab:sa,f:'Fall und Tenkiyohō; gleiches Attribut wie dein Schwert'})}
+  if(c.classId==='samurai'){const sa=swordAb(c);out.push({l:'Technik-DC',v:8+pb+m[sa],ab:sa,f:'deine Samurai-Techniken'})}
   else if(ab)out.push({l:'Klassen-DC',v:8+pb+m[ab],ab,f:'Saving Throws gegen deine '+C[c.classId].name+'-Fähigkeiten'});
   if(c.raceId==='kitsune')out.push({l:'Kitsune-DC',v:8+pb+m.cha,ab:'cha',f:'Kitsune-Fähigkeiten und Kitsune-Zauber',atk:pb+m.cha});
   return out}
