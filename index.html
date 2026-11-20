@@ -1907,7 +1907,13 @@ function viewRules(c){const cl=C[c.classId],r=R[c.raceId];const w=h('div');
   const rr=h('div');rr.append(h('p',{class:'note'},r.attr));for(const x of r.extra||[])rr.append(h('p',{class:'note'},x));
   for(const lv of Object.keys(r.levels).sort((a,b)=>a-b))rr.append(h('details',{open:+lv<=c.level?true:null},h('summary',{},'Stufe '+lv+(+lv>c.level?' · noch nicht erreicht':'')),renderLines(r.levels[lv].map(x=>x.h?'## '+x.h:x.t))));
   w.append(foldSec('rasse',r.kanji.slice(0,1)||'種','Rasse: '+r.name,rr));
-  if(isYokai(c)){const mm=h('div');mm.append(h('p',{class:'note'},'Jeder Yokai führt neben seiner Klasse eine zweite Spur. Auf den Stufen 3, 6, 10, 14 und 18 knüpfst du ein Band zu einem benannten Menschen und wählst eine Lehre. Stirbt ein Mensch, zu dem du ein Band hast, erhältst du die Lehre Trauer.'));
+  if(isYokai(c)){const mm=h('div');mm.append(h('p',{class:'note'},'Jeder Yokai führt neben seiner Klasse eine zweite Spur. Mitama steigt mit deiner Charakterstufe mit, ohne eigene Slots.'));
+    {const lv=DATA.mitama.levels||[3,6,10,14,18];const nx=lv.find(x=>x>c.level);const t=h('table');t.append(h('tr',{},h('th',{},'Wann'),h('th',{},'Was du wählst')));
+      t.append(h('tr',{},h('td',{},h('b',{},'Aufstieg auf Stufe '+lv.join(', ').replace(/, (\d+)$/,' und $1'))),h('td',{},'Du knüpfst ein Band zu einem benannten Menschen, der dich kennt (du benennst ihn, der Spielleiter macht ihn zur Figur), und wählst dafür eine Lehre. Das geschieht im Tab Aufstieg; eine noch offene Lehre wählst du im Tab Mitama.')));
+      t.append(h('tr',{},h('td',{},h('b',{},'Welche Lehre')),h('td',{},'Nur aus der Seite, auf der deine Waage gerade steht: Nigimitama oder Aramitama. Steht sie in der Mitte, aus beiden. Keine Lehre zweimal.')));
+      t.append(h('tr',{},h('td',{},h('b',{},'Trauer')),h('td',{},'Keine Wahl: Stirbt ein Mensch, zu dem du ein Band hast, erhältst du die Lehre Trauer, egal wo deine Waage steht. Das Band zählt weiter.')));
+      t.append(h('tr',{},h('td',{},h('b',{},'Stufen der Waage')),h('td',{},'Keine Wahl: Sie wirken passiv, solange die Waage dort steht, und fallen weg, wenn sie sinkt.')));
+      mm.append(h('div',{class:'tblw'},t),h('p',{class:'note',style:'margin-top:6px'},h('b',{},nx?'Dein nächstes Band: Stufe '+nx+'.':'Du hast alle fünf Bande erreicht.'),' Gewählte Bande: '+(c.bonds||[]).length+' von '+lv.filter(x=>x<=c.level).length+' möglichen.'))}
     for(const[key,title]of[['nigi','Nigimitama — was man von Menschen lernt'],['ara','Aramitama — was man wird, wenn man gefürchtet wird']]){const t=h('table');t.append(h('tr',{},h('th',{},'Lehre'),h('th',{},'Wirkung')));for(const[n,x]of DATA.mitama[key])t.append(h('tr',{},h('td',{},h('b',{},n)),h('td',{},x)));mm.append(h('details',{},h('summary',{},title),h('div',{class:'tblw'},t)))}
     mm.append(h('details',{},h('summary',{},'Trauer'),h('p',{},DATA.mitama.trauer)));
     w.append(foldSec('mitama','魂','Mitama',mm))}
