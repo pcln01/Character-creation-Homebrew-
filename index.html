@@ -1102,7 +1102,7 @@ async function driveFlush(){if(TEST)return;if(drive.busy){driveSave();return}dri
 async function drivePoll(){if(TEST||document.hidden||!S.chars.length)return;let changed=false;store.forced=store.forced||{};
   for(const c of S.chars.filter(c=>c.id===activeId())){try{const r=await driveCall({action:'get',id:c.id,key:charKey(c.id)});const before=JSON.stringify(store.forced[c.id]||null);
       if(r.forced)store.forced[c.id]=r.forced;else if(r.ok||r.error==='not_found')delete store.forced[c.id];if(before!==JSON.stringify(store.forced[c.id]||null))changed=true}catch(e){}}
-  deliverDm();if(changed){render();toast('Der Spielleiter hat etwas an deinem Charakter freigeschaltet')}}
+  deliverDm();if(changed){render();toast('Der Spielleiter hat etwas an deinem Charakter freigeschaltet')}giftPoll()}
 function setTest(on){lsSave();TEST=!!on;try{localStorage.setItem('siegelrolle-testmode',on?'1':'0')}catch(e){}S.chars=lsLoad();S.sel=S.chars[0]?S.chars[0].id:null;S.dm=false;S.party=false;S.tab='sheet';drive.synced={};if(TEST)setStatus('<b>Testmodus</b> · nur in diesem Browser, nichts geht an Drive oder die Gruppe');else if(store.mode==='drive'){driveFlush();drivePoll()}render();toast(TEST?'Testmodus an: neue Charaktere bleiben in diesem Browser':'Testmodus aus: zurück bei deinen echten Charakteren')}
 function driveInit(){store.mode='drive';setStatus('Verbindet mit Google Drive …');drive.synced={};const a=activeId();for(const c of S.chars)if(c.id!==a)driveRemove(c.id);render();driveFlush();drivePoll();drive.poll=setInterval(drivePoll,120000)}
 function driveRemove(id){if(store.mode!=='drive'||TEST)return;driveCall({action:'remove',id,key:charKey(id)}).catch(()=>{})}
@@ -1168,8 +1168,12 @@ function armorFix(c,got){if(c.gearFix||!(+c.created<GEAR_SINCE)||!GEAR[c.classId
   const body=pk.find(n=>isBody(n)&&at.includes(ITEM[n].armor.type));if(body&&!(c.inv||[]).some(i=>i.armor&&/^(light|medium|heavy)$/.test(i.armor.type))){addItem(c,ITEM[body]);const it=c.inv.find(i=>i.n===body);it.equipped=true;for(const i of c.inv)if(i.armor&&i.armor.type==='clothes')i.equipped=false;add.push(body)}
   const sh=pk.find(isShield);if(sh&&shieldOk(st)&&!(c.inv||[]).some(i=>i.armor&&i.armor.type==='shield')){addItem(c,ITEM[sh]);c.inv.find(i=>i.n===sh).equipped=true;add.push(sh)}
   if(add.length)got.push((c.name||'Charakter')+': Startrüstung '+add.join(', '))}
-function deliverDm(){const got=[];for(const c of S.chars){armorFix(c,got);const o=ovOf(c);const f=CLAN_FIX[c.id];if(f&&c.clan===f[0]&&o.clan===undefined)clanSync(c,{clan:f[1]},got);clanSync(c,o,got);for(const it of o.items||[]){c.dmGot=c.dmGot||[];if(c.dmGot.includes(it.id))continue;c.dmGot.push(it.id);
-      const x={id:uid(),n:it.n,d:(it.d?it.d+' · ':'')+'vom Spielleiter',q:+it.q||1,w:+it.w||catW(it.n),dm:true};if(it.armor)x.armor={...it.armor};if(it.wf)x.wf={...it.wf};if(it.attReq)x.attReq=true;if(it.mat)x.mat={art:it.mat.art,per:Math.max(1,Math.round((+it.mat.n||1)/(+it.q||1)))};if(!ITEM[it.n])x.custom=true;c.inv.push(x);got.push((c.name||'Charakter')+': '+it.n)}}
+function dmRevApply(c,it,got){c.dmRev=c.dmRev||{};const r=+it.rev||0;if(r<=(+c.dmRev[it.id]||0))return;c.dmRev[it.id]=r;
+  const x=(c.inv||[]).find(i=>i.src===it.id)||(c.inv||[]).find(i=>i.dm&&!i.src&&i.n===it.n);if(!x)return;x.src=it.id;
+  if(!ITEM[it.n]){if(it.armor){x.armor={...it.armor};delete x.wf}else if(it.wf){x.wf={...it.wf};delete x.armor}else{if(x.armor||x.wf)x.equipped=false;delete x.armor;delete x.wf}}
+  x.attReq=!!it.attReq;if(!x.attReq)x.att=false;if(it.d)x.d=it.d+' · vom Spielleiter';got.push((c.name||'Charakter')+': '+x.n+' geändert')}
+function deliverDm(){const got=[];for(const c of S.chars){armorFix(c,got);const o=ovOf(c);const f=CLAN_FIX[c.id];if(f&&c.clan===f[0]&&o.clan===undefined)clanSync(c,{clan:f[1]},got);clanSync(c,o,got);for(const it of o.items||[]){c.dmGot=c.dmGot||[];if(c.dmGot.includes(it.id)){dmRevApply(c,it,got);continue}c.dmGot.push(it.id);c.dmRev=c.dmRev||{};c.dmRev[it.id]=+it.rev||0;
+      const x={id:uid(),n:it.n,d:(it.d?it.d+' · ':'')+'vom Spielleiter',q:+it.q||1,w:+it.w||catW(it.n),dm:true,src:it.id};if(it.armor)x.armor={...it.armor};if(it.wf)x.wf={...it.wf};if(it.attReq)x.attReq=true;if(it.mat)x.mat={art:it.mat.art,per:Math.max(1,Math.round((+it.mat.n||1)/(+it.q||1)))};if(!ITEM[it.n])x.custom=true;c.inv.push(x);got.push((c.name||'Charakter')+': '+it.n)}}
   if(got.length){save();render();toast('Vom Spielleiter erhalten · '+got.join(', '))}}
 function dmView(c){const o=ovOf(c);const els=(o.elements||[]).filter(e=>!(e.typ==='Schule'&&SCHOOLS.includes(e.name))),races=o.races||[],tit=o.titel||[];if(!els.length&&!races.length&&!tit.length)return null;const w=h('div');
   if(tit.length){const tl=h('div');for(const t of tit)tl.append(h('div',{class:'feat'},h('b',{style:'font-family:var(--f-disp);font-style:italic;color:var(--shu);font-size:16px'},'称 '+t.name),t.text?h('p',{class:'note',style:'margin:4px 0 0;white-space:pre-wrap'},t.text):null));w.append(card('称 Titel',tl))}
@@ -1247,7 +1251,7 @@ function dropsPane(c,o,set,src){const w=h('div');
     if(!items.length)return toast('Nichts ausgewählt');dropsSt.pick={};dropsSt.pickFor=null;set(o=>{o.items=[...(o.items||[]),...items]})},{id:'dropsGive'})));
   w.append(box,NOTE('Alles landet im Inventar des Spielers, markiert als „vom Spielleiter“.'));
   return w}
-let tiEdit=null;
+let tiEdit=null,giveEdit=null;
 function dmTools(c,src){const o=JSON.parse(JSON.stringify(ovOf(c)));const set=fn=>{fn(o);saveOverlay(c,o,src)};const w=h('div');
   const fc=forceControls(c,subOf(c),v=>set(o=>{if(v){o.sub=v.sub;if(v.stufe)o.stufe=v.stufe;else delete o.stufe}else{o.sub=null;delete o.stufe}}));if(fc)w.append(card('進 Unterrasse',fc));
   if(isYokai(c)){const mv=mitamaVal(c);const st=mitamaStage(mv);const setM=v=>set(o=>{o.mitama=Math.max(-5,Math.min(5,v))});
@@ -1258,7 +1262,12 @@ function dmTools(c,src){const o=JSON.parse(JSON.stringify(ovOf(c)));const set=fn
   const gst={pre:'g-',kind:'other',wf:{dmg:'1d6',type:'Slashing',props:'',cat:'Simple',rng:false},armor:{type:'light',base:11}};const gkf=kindFields(gst,false);const gatt=h('input',{type:'checkbox',id:'giveAtt'});
   const iname=h('input',{id:'giveName',placeholder:'oder eigenes Item: Name'}),idesc=h('input',{id:'giveDesc',placeholder:'Beschreibung / Wirkung',style:'flex:1;min-width:200px'}),iw=nIn('giveW',0,0,999,64),iq=nIn('giveQ',1,1,99,56);
   isel.addEventListener('change',()=>{const cat=ITEM[isel.value];if(cat){iname.value='';iw.value=cat.w||0;idesc.placeholder=cat.d||'Beschreibung / Wirkung'}gkf.style.display=cat?'none':''});iname.addEventListener('input',()=>{const w=catW(iname.value);if(w)iw.value=w});
-  const il=h('div');(o.items||[]).forEach((it,i)=>il.append(row(h('b',{},(it.q>1?it.q+'× ':'')+it.n),(c.dmGot||[]).includes(it.id)?h('span',{class:'chip'},'✓ im Inventar'):h('span',{class:'chip shu',title:'Kommt an, sobald der Spieler die Siegelrolle mit diesem Charakter offen hat'},'unterwegs'),h('span',{class:'note'},it.d||''),sbtn('✕',()=>set(o=>{o.items.splice(i,1)}),{'aria-label':'Aus der Liste nehmen'}))));
+  const il=h('div');(o.items||[]).forEach((it,i)=>{if(giveEdit===c.id+'|'+it.id){const st={pre:'ge-',kind:it.armor?'armor':it.wf?'weapon':'other',wf:{dmg:'1d6',type:'Slashing',props:'',cat:'Simple',rng:false,...(it.wf||{})},armor:{type:'light',base:11,...(it.armor||{})}};const fx=!!ITEM[it.n];
+      const ed=h('input',{id:'geDesc',value:it.d||'',placeholder:'Beschreibung / Wirkung','aria-label':'Beschreibung',style:'flex:1;min-width:200px'}),ea=h('input',{type:'checkbox',id:'geAtt'});ea.checked=!!it.attReq;
+      il.append(h('div',{class:'feat'},h('b',{},it.n),row(ed),fx?NOTE('Katalog-Item: Art und Werte stehen fest.'):kindFields(st,false),row(h('label',{class:'note'},ea,' Benötigt Attunement')),
+        row(pbtn('Speichern',()=>{giveEdit=null;set(o=>{const x=o.items.find(y=>y.id===it.id);if(!x)return;x.d=ed.value.trim();if(!fx)kindApply(x,st);if(ea.checked)x.attReq=true;else delete x.attReq;x.rev=(+x.rev||0)+1})},{id:'geSave'}),sbtn('Abbrechen',()=>{giveEdit=null;render()})),
+        NOTE('Die Änderung kommt beim nächsten Abgleich auch beim Spieler an, wenn er den Gegenstand noch hat.')));return}
+    il.append(row(h('b',{},(it.q>1?it.q+'× ':'')+it.n),it.armor?h('span',{class:'chip'},'Rüstung · AC '+it.armor.base):it.wf?h('span',{class:'chip'},'Waffe · '+it.wf.dmg+' '+it.wf.type):null,(c.dmGot||[]).includes(it.id)?h('span',{class:'chip'},'✓ im Inventar'):h('span',{class:'chip shu',title:'Kommt an, sobald der Spieler die Siegelrolle mit diesem Charakter offen hat'},'unterwegs'),h('span',{class:'note'},it.d||''),sbtn('✎',()=>{giveEdit=c.id+'|'+it.id;render()},{id:'gEdit-'+i,'aria-label':it.n+' ändern'}),sbtn('✕',()=>set(o=>{o.items.splice(i,1)}),{'aria-label':'Aus der Liste nehmen'})))});
   const gTab=dmGiveTab;const tabs=h('div',{class:'pick',style:'margin:2px 0 8px'},[['item','Item'],['drops','Drops']].map(([k,l])=>h('button',{class:'pill',type:'button','aria-pressed':String(gTab===k),id:'giveTab-'+k,onclick:()=>{dmGiveTab=k;render()}},l)));
   if(gTab==='drops')w.append(card('贈 Besonderes Item geben',tabs,dropsPane(c,o,set,src),il.childNodes.length?h('div',{style:'margin-top:8px'},h('div',{class:'label'},'Bisher gegeben'),il):null));
   else w.append(card('贈 Besonderes Item geben',tabs,row(isel),row(iname,idesc),gkf,row(h('label',{class:'note'},gatt,' Benötigt Attunement')),row(h('label',{class:'note',for:'giveW'},'Gewicht lb.'),iw,h('label',{class:'note',for:'giveQ'},'Anzahl'),iq,
@@ -1402,7 +1411,7 @@ function drivePartyLogin(box){const pw=h('input',{type:'password',id:'dmPw',plac
   pw.addEventListener('keydown',e=>{if(e.key==='Enter')go()});
   box.append(h('div',{class:'vital',style:'grid-column:1/-1;max-width:420px'},h('div',{class:'label'},'Nur für den Spielleiter'),h('p',{class:'note'},'Das Passwort prüft dein Skript bei Google, es steht nicht in dieser Seite.'),h('div',{class:'addrow'},pw,h('button',{class:'btn',type:'button',id:'dmPwBtn',onclick:go},'Anmelden')),msg))}
 function drivePartyFill(box){box.textContent='';
-  if(!drive.roster){box.append(h('p',{class:'note'},'Lädt die Gruppe aus Drive …'));driveCall({action:'roster'}).then(r=>{if(!r.ok)throw r;drive.roster=r.chars||[];{const mine=new Set(S.chars.map(c=>c.id));const f={...(store.forced||{})};for(const[k,v]of Object.entries(r.forced||{}))if(!mine.has(k)||!f[k])f[k]=v;store.forced=f}if(S.party)render()}).catch(e=>{box.textContent='';box.append(h('p',{class:'note'},e&&e.error==='unknown_action'?'Die Gruppenansicht braucht die neue Version deines Google-Skripts.':'Drive nicht erreichbar.'))});return}
+  if(!drive.roster){box.append(h('p',{class:'note'},'Lädt die Gruppe aus Drive …'));driveCall({action:'roster'}).then(r=>{if(!r.ok)throw r;drive.roster=r.chars||[];giftsApply();{const mine=new Set(S.chars.map(c=>c.id));const f={...(store.forced||{})};for(const[k,v]of Object.entries(r.forced||{}))if(!mine.has(k)||!f[k])f[k]=v;store.forced=f}if(S.party)render()}).catch(e=>{box.textContent='';box.append(h('p',{class:'note'},e&&e.error==='unknown_action'?'Die Gruppenansicht braucht die neue Version deines Google-Skripts.':'Drive nicht erreichbar.'))});return}
   if(!drive.roster.length)box.append(h('p',{class:'note'},'Noch hat niemand einen Charakter angelegt.'));
   for(const x of drive.roster){const c=x.char;if(!c||!C[c.classId]||!R[c.raceId])continue;c.id=c.id||x.id;const cl=C[c.classId];const mine=S.chars.some(y=>y.id===c.id);
     box.append(h('div',{class:'pc'},h('span',{class:'hanko'+(cl.kanji.length>1?' v':'')},cl.kanji.slice(0,2)),h('div',{},h('b',{},(c.name||'Ohne Namen')+(mine?' (du)':'')),h('div',{},`${raceName(c)} · ${cl.name} · Stufe ${c.level}`),
@@ -1445,6 +1454,30 @@ function kindFields(st,fixed){const w=h('div');const draw=()=>{w.replaceChildren
 function kindApply(x,st){if(st.kind==='weapon'){x.wf={...st.wf};delete x.armor}else if(st.kind==='armor'){x.armor={type:st.armor.type,base:+st.armor.base||0};delete x.wf}else{delete x.wf;delete x.armor;x.equipped=false}}
 function splitOne(c,id){const i=c.inv.findIndex(x=>x.id===id);const x=c.inv[i];if(!x||(x.q||1)<2)return x;x.q-=1;const y=JSON.parse(JSON.stringify(x));y.id=uid();y.q=1;y.custom=true;y.att=false;c.inv.splice(i+1,0,y);return y}
 function toggleAtt(c,it){if(!it.att&&attCount(c)>=ATT_MAX)return toast('Alle '+ATT_MAX+' Attunement-Slots sind belegt. Löse erst einen anderen Gegenstand.');upd(c=>{const x=c.inv.find(i=>i.id===it.id);x.att=!x.att})}
+let invGive=null;
+function giveTargets(c){const loc=S.chars.filter(x=>x.id!==c.id).map(x=>({id:x.id,name:(x.name||'Ohne Namen')+' (dieses Gerät)',local:true}));const ids=new Set(S.chars.map(x=>x.id));
+  const rem=(drive.roster||[]).map(x=>x.char).filter(x=>x&&!ids.has(x.id)).map(x=>({id:x.id,name:x.name||'Ohne Namen'}));return[...loc,...rem]}
+function stackIn(c,y){c.inv=c.inv||[];const ex=!y.custom&&!y.mod&&!y.wf&&c.inv.find(i=>i.n===y.n&&!i.custom&&!i.mod&&!i.wf);if(ex)ex.q=(ex.q||1)+(y.q||1);else c.inv.push(y)}
+function giftCopy(it,n,from){const y=JSON.parse(JSON.stringify(it));y.id=uid();y.q=n;y.equipped=false;y.att=false;delete y.src;y.from=from;return y}
+function giveItem(c,it,tid,n){const t=giveTargets(c).find(x=>x.id===tid);if(!t)return toast('Empfänger wählen');n=Math.max(1,Math.min(it.q||1,n||1));invGive=null;
+  upd(c=>{const x=c.inv.find(i=>i.id===it.id);if(!x)return;const y=giftCopy(x,n,c.name||'Ohne Namen');if((x.q||1)>n)x.q-=n;else c.inv=c.inv.filter(i=>i.id!==x.id);
+    if(t.local){const tc=S.chars.find(z=>z.id===t.id);stackIn(tc,y)}else{c.outbox=[...(c.outbox||[]),{id:uid(),to:t.id,toName:t.name,item:y,at:Date.now()}]}});
+  toast(t.local?(n>1?n+'× ':'')+it.n+' an '+t.name+' übergeben':(n>1?n+'× ':'')+it.n+' ist unterwegs zu '+t.name+'. Es kommt an, sobald '+t.name+' die Siegelrolle offen hat.')}
+async function rosterLoad(){const r=await driveCall({action:'roster'});if(!r.ok)throw r;drive.roster=r.chars||[];return drive.roster}
+function giftsApply(){if(!drive.roster)return false;const got=[];let ch=false;const rc=drive.roster.map(x=>x.char).filter(Boolean);
+  for(const c of S.chars){for(const o of rc){if(o.id===c.id)continue;for(const g of o.outbox||[]){if(g.to!==c.id)continue;c.giftGot=c.giftGot||[];if(c.giftGot.includes(g.id))continue;c.giftGot.push(g.id);const y=JSON.parse(JSON.stringify(g.item));y.id=uid();stackIn(c,y);got.push((y.q>1?y.q+'× ':'')+y.n+' von '+(o.name||y.from||'?'));ch=true}}
+    if((c.outbox||[]).length){const keep=c.outbox.filter(g=>{const t=rc.find(o=>o.id===g.to);return!(t&&(t.giftGot||[]).includes(g.id))});if(keep.length!==c.outbox.length){c.outbox=keep;ch=true}}}
+  if(ch){save();render()}if(got.length)toast('Erhalten: '+got.join(', '));return ch}
+async function giftPoll(){if(TEST||store.mode!=='drive'||!S.chars.length)return;try{await rosterLoad();giftsApply()}catch(e){}}
+async function giftBack(c,g){try{if(store.mode==='drive'&&!TEST)await rosterLoad()}catch(e){return toast('Drive nicht erreichbar. Versuch es gleich noch einmal.')}
+  const t=(drive.roster||[]).map(x=>x.char).find(o=>o&&o.id===g.to);if(t&&(t.giftGot||[]).includes(g.id)){upd(c=>{c.outbox=(c.outbox||[]).filter(x=>x.id!==g.id)});return toast(g.item.n+' ist schon bei '+g.toName+' angekommen')}
+  upd(c=>{if(!(c.outbox||[]).some(x=>x.id===g.id))return;c.outbox=c.outbox.filter(x=>x.id!==g.id);const y=JSON.parse(JSON.stringify(g.item));y.id=uid();delete y.from;stackIn(c,y)});toast(g.item.n+' zurückgeholt')}
+function giveBox(c,it){const ts=giveTargets(c);const need=store.mode==='drive'&&!TEST&&!drive.roster;
+  if(need)rosterLoad().then(()=>{giftsApply();render()}).catch(()=>{});
+  const sel=h('select',{id:'gvTo','aria-label':'Empfänger'},h('option',{value:''},need?'Lädt die Gruppe …':ts.length?'An wen?':'Niemand sonst in der Gruppe'),ts.map(t=>h('option',{value:t.id},t.name)));
+  const q=nIn('gvQ',it.q||1,1,it.q||1,60);
+  return h('div',{class:'feat',style:'grid-column:1/-1;margin:4px 0 10px'},h('div',{class:'label'},'⇄ '+it.n+' weitergeben'),row(sel,(it.q||1)>1?h('label',{class:'note',for:'gvQ'},'Anzahl'):null,(it.q||1)>1?q:null,pbtn('Übergeben',()=>giveItem(c,it,sel.value,+q.value||1),{id:'gvBtn'}),sbtn('Abbrechen',()=>{invGive=null;render()})),
+    NOTE('Der Gegenstand verlässt sofort dein Inventar. Beim anderen Spieler kommt er an, sobald er die Siegelrolle mit seinem aktiven Charakter offen hat. Solange er unterwegs ist, kannst du ihn zurückholen.'))}
 function invEditor(c,it){const base=ITEM[wBaseN(it)];const fixed=!!(base&&(base.cat==='Waffe'||base.armor)&&!it.wf);
   const st={pre:'ie-',kind:it.armor?'armor':(it.wf||(base&&base.cat==='Waffe'))?'weapon':'other',wf:{dmg:'1d6',type:'Slashing',props:'',cat:'Simple',rng:false,...(it.wf||{})},armor:{type:'light',base:11,...(it.armor||{})}};
   const nm=h('input',{id:'ieName',value:it.n,'aria-label':'Name',style:'flex:1;min-width:180px'}),ds=h('input',{id:'ieDesc',value:it.d||'',placeholder:'Beschreibung / Wirkung','aria-label':'Beschreibung',style:'flex:2;min-width:200px'});
@@ -1474,17 +1507,19 @@ function viewInv(c){const cl=C[c.classId];const w=h('div');c.inv=c.inv||[];
   const list=h('div',{class:'inv'});
   if(!c.inv.length)list.append(h('p',{class:'note'},'Dein Bündel ist leer. Übernimm die gemeinsame Ausrüstung oder füge Gegenstände aus den Listen unten hinzu.'));
   for(const it of c.inv){const iw=itemW(it);const wp=isWpn(it);const md=modTxt(it);
-    const acts=h('div',{class:'addrow',style:'margin-top:4px;gap:4px'},sbtn('✎',()=>{invEdit=invEdit===it.id?null:it.id;render()},{id:'ied-'+it.id,'aria-label':it.n+' bearbeiten',title:'Bearbeiten, umbenennen, modifizieren'}),
+    const acts=h('div',{class:'addrow',style:'margin-top:4px;gap:4px'},sbtn('✎',()=>{invEdit=invEdit===it.id?null:it.id;invGive=null;render()},{id:'ied-'+it.id,'aria-label':it.n+' bearbeiten',title:'Bearbeiten, umbenennen, modifizieren'}),
+      sbtn('⇄',()=>{invGive=invGive===it.id?null:it.id;invEdit=null;render()},{id:'igv-'+it.id,'aria-label':it.n+' an einen anderen Spieler geben',title:'An einen anderen Spieler geben'}),
       wp&&(it.q||1)>1?sbtn('Teilen',()=>upd(c=>{splitOne(c,it.id)}),{id:'isp-'+it.id,title:'Ein Stück als eigenen Eintrag abtrennen'}):null,
       it.attReq?sbtn(it.att?'◆ eingestimmt':'◇ einstimmen',()=>toggleAtt(c,it),{id:'iat-'+it.id,'aria-pressed':String(!!it.att)}):null);
     list.append(h('div',{class:'it'},
-    h('div',{},h('div',{class:'n'},it.n,it.att?h('span',{class:'chip shu',style:'margin-left:6px'},'◆ Attunement'):null,md?h('span',{class:'chip',style:'margin-left:6px'},'⚒ modifiziert'):null,mChips(c,wBaseN(it))),
+    h('div',{},h('div',{class:'n'},it.n,it.from?h('span',{class:'chip',style:'margin-left:6px'},'von '+it.from):null,it.att?h('span',{class:'chip shu',style:'margin-left:6px'},'◆ Attunement'):null,md?h('span',{class:'chip',style:'margin-left:6px'},'⚒ modifiziert'):null,mChips(c,wBaseN(it))),
       it.base&&it.base!==it.n?h('div',{class:'d'},'Basis: '+it.base):null,it.wf?h('div',{class:'d'},'Waffe · '+mkWd(it.wf)):null,it.armor&&!ITEM[wBaseN(it)]?.armor?h('div',{class:'d'},'Rüstung · '+(ARMT.find(a=>a[0]===it.armor.type)||['',''])[1]+' · AC '+it.armor.base):null,md?h('div',{class:'d',style:'color:var(--shu)'},'⚒ '+md):null,it.d?h('div',{class:'d'},it.d):null,acts),
     (it.armor||wp)?h('label',{class:'eq'},(()=>{const cb=h('input',{type:'checkbox',id:'eq-'+it.id});cb.checked=!!it.equipped;cb.addEventListener('change',()=>upd(c=>{const x=c.inv.find(i=>i.id===it.id);x.equipped=cb.checked}));return cb})(),it.armor?'angelegt':'bereit'):h('span'),
     h('span',{class:'iw'},fmtW(iw*(it.q||1))+' lb.'),
     h('div',{class:'qty'},h('button',{type:'button','aria-label':'Weniger',onclick:()=>upd(c=>{const x=c.inv.find(i=>i.id===it.id);x.q=Math.max(1,(x.q||1)-1)})},'−'),h('span',{},it.q||1),h('button',{type:'button','aria-label':'Mehr',onclick:()=>upd(c=>{const x=c.inv.find(i=>i.id===it.id);x.q=(x.q||1)+1})},'+')),
     h('button',{class:'iconb',type:'button','aria-label':it.n+' entfernen',onclick:()=>upd(c=>{c.inv=c.inv.filter(i=>i.id!==it.id)})},'✕')));
-    if(invEdit===it.id)list.append(invEditor(c,it))}
+    if(invEdit===it.id)list.append(invEditor(c,it));if(invGive===it.id)list.append(giveBox(c,it))}
+  if((c.outbox||[]).length)list.append(h('div',{class:'feat',style:'margin-top:8px'},h('div',{class:'label'},'Unterwegs zu anderen Spielern'),...c.outbox.map(g=>row(h('span',{style:'flex:1;min-width:160px'},(g.item.q>1?g.item.q+'× ':'')+g.item.n+' → '+g.toName),sbtn('Zurückholen',()=>giftBack(c,g),{id:'gb-'+g.id})))));
   const nm=h('input',{id:'itemName',placeholder:'Eigener Gegenstand','aria-label':'Name des Gegenstands',style:'flex:2 1 180px'});const nd=h('input',{id:'itemNote',placeholder:'Notiz','aria-label':'Notiz',style:'flex:2 1 140px'});const nw=h('input',{id:'itemW',type:'number',min:'0',step:'0.1',placeholder:'lb.','aria-label':'Gewicht in lb.',style:'flex:0 1 80px'});
   const nk=h('select',{id:'itemKind','aria-label':'Art des Gegenstands',style:'flex:0 1 120px'},h('option',{value:'other'},'Sonstiges'),h('option',{value:'weapon'},'Waffe'),h('option',{value:'armor'},'Rüstung'));
   const addOwn=()=>{if(!nm.value.trim())return;const id=uid();const k=nk.value;upd(c=>{const x={id,n:nm.value.trim(),d:nd.value.trim(),q:1,w:Math.max(0,+nw.value||0),custom:true};
