@@ -1988,6 +1988,50 @@ function viewRules(c){const cl=C[c.classId],r=R[c.raceId];const w=h('div');
     for(const[key,title]of[['nigi','Nigimitama — was man von Menschen lernt'],['ara','Aramitama — was man wird, wenn man gefürchtet wird']]){const t=h('table');t.append(h('tr',{},h('th',{},'Lehre'),h('th',{},'Wirkung')));for(const[n,x]of DATA.mitama[key])t.append(h('tr',{},h('td',{},h('b',{},n)),h('td',{},x)));mm.append(h('details',{},h('summary',{},title),h('div',{class:'tblw'},t)))}
     mm.append(h('details',{},h('summary',{},'Trauer'),h('p',{},DATA.mitama.trauer)));
     w.append(foldSec('mitama','魂','Mitama',mm))}
+  w.append(foldSec('handwerk','匠','Handwerk & Sammeln',craftRules()));
+  return w}
+function craftRules(){const T=(hd,rows)=>{const t=h('table');t.append(h('tr',{},hd.map(x=>h('th',{},x))));for(const r of rows)t.append(h('tr',{},r.map(x=>h('td',{},x))));return h('div',{class:'tblw'},t)};
+  const P=t=>h('p',{},t),N=t=>h('p',{class:'note'},t),D=(t,...k)=>h('details',{},h('summary',{},t),...k);const w=h('div');
+  w.append(N('Was man zwischen zwei Schreinen tut, wenn man nicht kämpft: Rohstoffe sammeln, schmieden, Tränke brauen und Unbekanntes erforschen.'));
+  w.append(D('Werkzeuge',T(['Werkzeug','Braucht man für','Haltbarkeit'],[['Spitzhacke','Bergbau','30 Anwendungen'],['Angel','Fischen','30 Anwendungen'],['Sichel','Kräutersammeln','30 Anwendungen'],['Schmiedewerkzeug / Amboss','Schmieden, Reparaturen','kein Verschleiß']]),
+    P('Jeder Versuch zählt als eine Anwendung, egal ob er etwas einbringt. Nach der 30. Anwendung bricht das Werkzeug; das Ergebnis dieser letzten Anwendung bekommst du noch.'),
+    P('Kräutersammeln geht auch mit bloßen Händen, nur mit schlechterer Ausbeute. Bergbau und Fischen brauchen zwingend das Werkzeug.')));
+  w.append(D('Bergbau',P('An einer Erzader oder Fundstelle, in drei Schritten.'),
+    h('p',{},h('b',{},'1 · Fundort. '),'Ein Perception Check findet die Stelle und legt fest, wie ergiebig der Fund ist. Eine Fähigkeit, die Erz oder Edelsteine automatisch aufspürt (z. B. Mienensicht oder Gemstone Sight des Iwa-no-sei), ersetzt den Wurf durch die höchste zutreffende Stufe.'),
+    T(['Ergebnis','Ōtomo','Kume / Sonneninsel'],[['Fehlschlag','1–5','1–10'],['Kleiner Fund','6–10','11–13'],['Mittlerer Fund','11–19','14–19'],['Großer Fund','20+','20+']]),
+    h('p',{},h('b',{},'2 · Schlag. '),'Ein Strength Check löst das Material aus dem Gestein.'),
+    T(['Ergebnis','Kleiner Fund','Mittlerer Fund','Großer Fund'],[['Fehlschlag','1–2','1–5','1'],['Erfolg','3–19','6–19','2–15'],['Kritischer Erfolg','20+','20+','16–20+']]),
+    T(['Ertrag','Kleiner Fund','Mittlerer Fund','Großer Fund'],[['Erfolg','2','5','10'],['Kritischer Erfolg','4','25','100']]),
+    h('p',{},h('b',{},'3 · Beschreibung. '),'Bei einem Erfolg beschreibst du, wie du zuschlägst. Ruhig und gezielt behältst du die volle Menge; ein hastiger, roher Schlag kann einen Teil des zerbrechlicheren Silbers und Golds kosten.'),
+    h('p',{},h('b',{},'Erzarten. '),'Die Menge setzt sich aus Eisen, Kupfer, Silber und Gold zusammen.'),
+    T(['Menge','Eisen','Kupfer','Silber','Gold'],[['2','2','—','—','—'],['4','2','1','1','—'],['5','2','1','1','1'],['10','4','2','2','2'],['25','10','5','5','5'],['100','40','20','20','20']]),
+    N('Ab einer Menge von 5 gilt immer 2 Eisen : 1 Kupfer : 1 Silber : 1 Gold. Eine Fundstelle liefert mehrere Anwendungen, bevor sie erschöpft ist.')));
+  w.append(D('Fischen',P('Fische gibt es in jedem Gewässer. Bei einem Long Rest an einem Gewässer kann die Gruppe einfach angeln.'),
+    h('p',{},h('b',{},'Auskundschaften (optional). '),'Ein Nature Check schätzt grob, ob es sich lohnt. Kostet keine Anwendung und ändert nichts am Fang.'),
+    h('p',{},h('b',{},'Angeln. '),'Jede Runde entscheidet der Spielleiter verdeckt, ob etwas an der Leine zieht. Du reagierst: anziehen oder warten. Drei richtige Reaktionen in Folge fangen den Fisch, zwei falsche in Folge lassen die Leine reißen. Beides verbraucht genau eine Anwendung der Angel.'),
+    h('p',{},h('b',{},'Fang. '),'Ein Fisch wiegt zufällig 1 bis 1000 lb. Je 5 lb. ergeben eine Ration.'),
+    h('p',{},h('b',{},'Schätze. '),'Nur an Orten, um die sich Geschichten von mystischem Wasser ranken. Jeder Schatz wird von einem Mizuchi, einem Kappa oder einem riesigen Fisch bewacht; besiegt ihr den Wächter, könnt ihr den Schatz von seinem Körper nehmen.')));
+  w.append(D('Kräutersammeln',P('Ein einzelner Nature Check bestimmt Fund und Menge.'),
+    T(['Ergebnis','Wurf','Menge (bloße Hand)'],[['Fehlschlag','1–5','0'],['Kleiner Erfolg','6–10','1d10'],['Mittlerer Erfolg','11–15','10 + 1d10'],['Großer Erfolg','16–19','20 + 1d10'],['Jackpot','20+','200']]),
+    P('Mit einer Sichel verfünffacht sich die Menge. Was genau du findest, entscheidet der Spielleiter nach Umgebung und Jahreszeit.'),
+    T(['Art','Material','Besonderheit'],[['Frucht','Kaki','Getrocknet ein Energiespeicher; Grundlage des Ausdauertranks'],['Frucht','Ume','Sauer, antiseptisch; Grundlage von Umeboshi'],['Frucht','Yuzu','Küche, Medizin, Ritualbad; Grundlage des Yuzu-Suds'],['Frucht','Nashi, Mikan','Gewöhnliche Zutat für den Heiltrank'],
+      ['Blüte','Sakura, Ume-Blüte, Kiku, Hasu, Fuji','Vor allem für „Aussehen anpassen“ beim Schmieden und für Rituale'],['Pilz','Shiitake, Nameko, Enoki, Kikurage','Nahrung: 3 Einheiten ergeben eine Ration'],['Pilz','Matsutake','Delikatesse mit hohem Handelswert, keine Ration']])));
+  w.append(D('Schmieden',P('Mit eigenem Schmiedewerkzeug oder an einem Amboss, während eines Long Rests. Die Erholung geht dabei nicht verloren.'),
+    h('p',{},h('b',{},'Ein Gegenstand pro Long Rest. '),'Entweder ein Rezept oder eine Reparatur: 1 Eisen setzt eine gebrochene Spitzhacke, Angel oder Sichel wieder auf 30 Anwendungen.'),
+    h('p',{},h('b',{},'Grundbaupläne. '),'Materialien für ein gewöhnliches +0-Exemplar.'),
+    T(['Waffe','Eisen','Kupfer'],[['Tantō, Kama','4','3'],['Bō, Jitte','5','3'],['Wakizashi, Azusa-yumi','6','3'],['Hankyū, Katana, Yari','8','3'],['Daikyū (Yumi), Naginata','10','3'],['Kanabō','12','3']]),
+    h('p',{},h('b',{},'Wurfwaffen. '),'Kunai und Wurfsterne entstehen in Bündeln zu 10 Stück: bis zu 3 Bündel pro Long Rest, in beliebiger Mischung, je Bündel 5 Eisen.'),
+    h('p',{},h('b',{},'Vertiefungen. '),'Ein Enhancement Bonus (+1, +2, …) oder ein eigener Wondrous Effect. Du sagst, was du anstrebst; der Spielleiter legt fest, welche zusätzlichen Materialien nötig sind und ob es hier überhaupt geht.'),
+    h('p',{},h('b',{},'Aussehen anpassen. '),'Rein optisch, ohne Regeländerung, etwa Kintsugi mit Gold. Material bestimmt der Spielleiter.'),
+    h('p',{},h('b',{},'Meisterwerkzeuge. '),'Unzerbrechliche Spitzhacke, Angel oder Sichel: je 100 Eisen, 30 Kupfer, 40 Silber und 60 Gold.'),
+    N('Grundbauplan, Vertiefung und Aussehen lassen sich in derselben Sitzung kombinieren, wenn alle Materialien da sind.')));
+  w.append(D('Tränke',P('Kräuterarbeit, kein Schmieden: Während eines Long Rests ergeben 5 Einheiten der passenden Frucht einen Trank. Pro Long Rest höchstens so viele Tränke wie dein Proficiency Bonus, in beliebiger Mischung.'),
+    T(['Trank','Frucht','Wirkung (Action)'],[['Heiltrank','Nashi oder Mikan','Heilt 2d4 + 2 Hit Points.'],['Ausdauertrank','Kaki','Zählt als eine Tagesration und entfernt eine Exhaustion-Stufe.'],['Umeboshi','Ume','Beendet poisoned und entfernt eine Exhaustion-Stufe.'],['Yuzu-Sud','Yuzu','Advantage auf den nächsten Corruption Saving Throw innerhalb von 24 Stunden (auch als 10-minütiges rituelles Bad).']])));
+  w.append(D('Forschen',P('Jede Klasse kann einen unbekannten Gegenstand im eigenen Besitz erforschen: eine Stunde ungestörte Arbeit, im Rahmen eines Short Rests oder länger.'),
+    h('p',{},h('b',{},'1 · Untersuchen. '),'Ein Perception Check findet Markierungen und Zeichen. ',h('b',{},'2 · Deuten. '),'Ein Arcana Check mit demselben DC übersetzt sie.'),
+    T(['Herkunft des Gegenstands','DC'],[['Talisman','12'],['Wächter-Belohnung','15'],['Legendäres Artefakt','19+']]),
+    P('Beide bestanden: vollständig identifiziert. Nur Perception: du erkennst, dass er magisch ist und ungefähr wie mächtig. Perception verfehlt: nichts; neuer Versuch nach einem weiteren Short Rest.'),
+    N('Schreinpriester haben auf beide Checks automatisch Proficiency.')));
   return w}
 
 /* party */
